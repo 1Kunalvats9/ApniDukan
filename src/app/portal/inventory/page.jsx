@@ -179,7 +179,7 @@ const Inventory = () => {
       </div>
 
       {editingProduct && (
-        <div className="fixed inset-0 bg-white opacity-25 backdrop-blur-2xl flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-white/5 backdrop-blur-2xl flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-scale-in">
             <div className="flex justify-between items-center p-4 border-b border-slate-200">
               <h2 className="text-lg font-semibold">Edit Product</h2>

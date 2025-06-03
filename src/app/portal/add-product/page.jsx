@@ -1,12 +1,12 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Barcode, Save, X, ScanLine } from 'lucide-react';
 import { useAppContext } from '../../../context/AppContext';
-import { generateEAN13,isValidEAN13 } from '../../../utils/barcodeGenerator';
+import { generateEAN13, isValidEAN13 } from '../../../utils/barcodeGenerator';
 import BarcodeDisplay from '../../components/ui/BarcodeDisplay';
 
 const AddProduct = () => {
-  const { addProduct, getProductByBarcode } = useAppContext();
+  const { addProduct, getProductByBarcode, searchProducts } = useAppContext();
   const [formData, setFormData] = useState({
     name: '',
     barcode: '',
@@ -14,60 +14,157 @@ const AddProduct = () => {
     discountedPrice: '',
     quantity: '1',
   });
-  const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [productExists, setProductExists] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const barcodeInputRef = useRef(null);
+
+  const debounce = (func, wait) => {
+    let timeout;
+    return (...args) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func(...args), wait);
+    };
+  };
+
+  const debouncedSearch = useCallback(
+    debounce((query) => {
+      if (query.length < 2) {
+        setSearchResults([]);
+        setIsSearching(false);
+        return;
+      }
+      setIsSearching(true);
+      const results = searchProducts(query);
+      setSearchResults(results.slice(0, 5));
+      setIsSearching(false);
+    }, 300),
+    [searchProducts]
+  );
+
+  const handleSearchChange = (e) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    if (e.target.name === 'name') {
+      debouncedSearch(query);
+    }
+  };
+
+  const handleSelectProduct = (product) => {
+    setFormData({
+      name: product.name,
+      barcode: product.barcode,
+      originalPrice: product.originalPrice.toString(),
+      discountedPrice: product.discountedPrice.toString(),
+      quantity: product.quantity.toString(),
+    });
+    setSearchQuery('');
+    setSearchResults([]);
+    setProductExists(true);
+    setError('');
+    setSuccess('');
+  };
+
+  const handleBarcodeInput = useCallback(async (barcode) => {
+    setError('');
+    setSuccess('');
+
+    if (!barcode) {
+      setProductExists(false);
+      setFormData(prev => ({
+        ...prev,
+        barcode: '',
+        name: '',
+        originalPrice: '',
+        discountedPrice: '',
+        quantity: '1'
+      }));
+      return;
+    }
+
+    if (!isValidEAN13(barcode)) {
+      setError('Invalid barcode format. Must be a valid EAN-13 barcode.');
+      setProductExists(false);
+      return;
+    }
+
+    const product = getProductByBarcode(barcode);
+    if (product) {
+      setProductExists(true);
+      setFormData({
+        name: product.name,
+        barcode: product.barcode,
+        originalPrice: product.originalPrice.toString(),
+        discountedPrice: product.discountedPrice.toString(),
+        quantity: product.quantity.toString(),
+      });
+      setSearchQuery('');
+      setSearchResults([]);
+    } else {
+      setProductExists(false);
+      setFormData(prev => ({
+        ...prev,
+        barcode,
+        originalPrice: '',
+        discountedPrice: '',
+        quantity: '1'
+      }));
+    }
+  }, [getProductByBarcode]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-
     setError('');
     setSuccess('');
 
     if (name === 'barcode' && value.length === 13) {
-      const product = getProductByBarcode(value);
-      if (product) {
-        setProductExists(true);
-        setFormData({
-          name: product.name,
-          barcode: product.barcode,
-          originalPrice: product.originalPrice.toString(),
-          discountedPrice: product.discountedPrice.toString(),
-          quantity: product.quantity.toString(),
-        });
-      } else {
-        setProductExists(false);
-      }
+      handleBarcodeInput(value);
     }
   };
 
   const handleGenerateBarcode = () => {
-    const barcode = generateEAN13();
-    setFormData(prev => ({ ...prev, barcode }));
+    const newBarcode = generateEAN13();
+    setFormData(prev => ({ ...prev, barcode: newBarcode }));
     setProductExists(false);
+    setError('');
+    setSuccess('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
+    console.log(formData)
     try {
-      if (formData.barcode && !isValidEAN13(formData.barcode)) {
+      let finalBarcode = formData.barcode;
+
+      if (!finalBarcode) {
+        finalBarcode = generateEAN13();
+        setFormData(prev => ({ ...prev, barcode: finalBarcode }));
+      }
+
+      if (finalBarcode && !isValidEAN13(finalBarcode)) {
         setError('Invalid barcode format. Must be a valid EAN-13 barcode.');
         return;
       }
 
+      if (!formData.name.trim()) {
+        setError('Product name cannot be empty.');
+        return;
+      }
+
       await addProduct({
-        name: formData.name,
-        barcode: formData.barcode,
+        name: formData.name.trim(),
+        barcode: finalBarcode,
         originalPrice: parseFloat(formData.originalPrice) || 0,
         discountedPrice: parseFloat(formData.discountedPrice) || 0,
         quantity: parseInt(formData.quantity) || 0,
       });
 
-      setSuccess('Product added successfully!');
-
+      setSuccess(`Product ${productExists ? 'updated' : 'added'} successfully!`);
       setFormData({
         name: '',
         barcode: '',
@@ -75,37 +172,39 @@ const AddProduct = () => {
         discountedPrice: '',
         quantity: '1',
       });
-
-      setTimeout(() => {
-        setSuccess('');
-      }, 3000);
+      setSearchQuery('');
+      setSearchResults([]);
+      setProductExists(false);
+      setTimeout(() => setSuccess(''), 3000);
+      barcodeInputRef.current?.focus();
     } catch (err) {
-      setError('Failed to add product. Please try again.');
+      console.error("Error adding/updating product:", err);
+      setError('Failed to add/update product. Please try again.');
     }
   };
 
-  const simulateScan = () => {
-    setScanning(true);
+  useEffect(() => {
+    const barcodeInput = barcodeInputRef.current;
+    if (barcodeInput) {
+      barcodeInput.focus();
 
-    setTimeout(() => {
-      const barcode = generateEAN13();
-      setFormData(prev => ({ ...prev, barcode }));
-      setScanning(false);
-
-      const product = getProductByBarcode(barcode);
-      setProductExists(!!product);
-
-      if (product) {
-        setFormData({
-          name: product.name,
-          barcode: product.barcode,
-          originalPrice: product.originalPrice.toString(),
-          discountedPrice: product.discountedPrice.toString(),
-          quantity: product.quantity.toString(),
-        });
-      }
-    }, 1500);
-  };
+      const handleGlobalKeyDown = (e) => {
+        if (e.target.tagName === 'INPUT' && e.target.id !== 'barcode') {
+          return;
+        }
+        if (document.activeElement === barcodeInput || e.key.match(/^\d$/)) {
+          if (e.key === 'Enter' && barcodeInput.value.length === 13) {
+            e.preventDefault();
+            handleBarcodeInput(barcodeInput.value);
+          }
+        }
+      };
+      document.addEventListener('keydown', handleGlobalKeyDown);
+      return () => {
+        document.removeEventListener('keydown', handleGlobalKeyDown);
+      };
+    }
+  }, [handleBarcodeInput]);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -115,31 +214,15 @@ const AddProduct = () => {
         <div className="p-4 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center">
           <h2 className="text-lg font-medium text-indigo-900 flex items-center">
             <ScanLine size={20} className="mr-2" />
-            Barcode Scanner
+            Barcode Scanner Ready
           </h2>
-          <button
-            className="btn btn-primary"
-            onClick={simulateScan}
-            disabled={scanning}
-          >
-            {scanning ? 'Scanning...' : 'Scan Barcode'}
-          </button>
         </div>
-        <div className="p-6 flex items-center justify-center bg-white">
-          {scanning ? (
-            <div className="text-center py-8">
-              <div className="w-full h-4 bg-slate-200 rounded-full overflow-hidden mb-4">
-                <div className="h-full bg-indigo-500 animate-pulse rounded-full" style={{ width: '70%' }}></div>
-              </div>
-              <p className="text-slate-600">Scanning barcode, please wait...</p>
-            </div>
-          ) : (
-            <div className="text-center py-8 text-slate-500">
-              <Barcode size={48} className="mx-auto mb-3 text-slate-400" />
-              <p>Click the scan button to scan a barcode</p>
-              <p className="text-xs mt-2">For demonstration purposes, this will generate a random barcode</p>
-            </div>
-          )}
+        <div className="p-6">
+          <div className="text-center">
+            <Barcode size={48} className="mx-auto mb-3 text-slate-400" />
+            <p className="text-slate-600">Simply scan a barcode, and it will auto-fill.</p>
+            <p className="text-xs mt-2 text-slate-500">The input field is always listening for barcode gun input.</p>
+          </div>
         </div>
       </div>
 
@@ -197,17 +280,44 @@ const AddProduct = () => {
         </div>
         <form onSubmit={handleSubmit} className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="md:col-span-2">
+            <div className="md:col-span-2 relative">
               <label htmlFor="name" className="label">Product Name</label>
               <input
                 type="text"
                 id="name"
                 name="name"
                 className="input w-full"
-                value={formData.name}
-                onChange={handleChange}
+                value={searchQuery || formData.name} // Display search query or formData.name
+                onChange={(e) => {
+                  const { name, value } = e.target;
+
+                  // Always update formData.name first
+                  setFormData(prev => ({ ...prev, [name]: value }));
+
+                  // Then, handle search logic based on the new value
+                  setSearchQuery(value); // Keep searchQuery in sync for display
+                  if (name === 'name') { // Ensure it's the name field
+                    debouncedSearch(value); // Debounce the search based on the new value
+                  }
+                }}
                 required
               />
+              {searchResults.length > 0 && searchQuery && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg">
+                  {searchResults.map((product) => (
+                    <div
+                      key={product.id}
+                      className="p-2 hover:bg-slate-50 cursor-pointer"
+                      onClick={() => handleSelectProduct(product)}
+                    >
+                      <div className="font-medium">{product.name}</div>
+                      <div className="text-sm text-slate-500">
+                        Barcode: {product.barcode} | Price: ₹{product.discountedPrice}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>
@@ -220,9 +330,10 @@ const AddProduct = () => {
                   className="input flex-1"
                   value={formData.barcode}
                   onChange={handleChange}
-                  placeholder="Enter or scan barcode"
+                  placeholder="Scan or enter barcode"
                   maxLength={13}
-                  required
+                  ref={barcodeInputRef}
+                  required={!formData.name}
                 />
                 <button
                   type="button"

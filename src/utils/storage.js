@@ -1,8 +1,6 @@
 import localforage from 'localforage';
 
-// Only configure localforage in browser environment
 if (typeof window !== 'undefined') {
-  // Configure localforage
   localforage.config({
     name: 'apni-dukaan',
     storeName: 'inventory',
@@ -14,7 +12,6 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// Cache management
 const cache = {
   products: null,
   customers: null,
@@ -22,7 +19,7 @@ const cache = {
   lastUpdate: 0
 };
 
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 5 * 60 * 1000;
 
 const isCacheValid = (key) => {
   return cache[key] !== null && (Date.now() - cache.lastUpdate) < CACHE_DURATION;

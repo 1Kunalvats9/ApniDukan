@@ -16,7 +16,7 @@ export const AppProvider = ({ children }) => {
   
   const analytics = {
     totalProducts: products.length,
-    inventoryWorth: products.reduce((acc, p) => acc + (Number(p.retailPrice) * Number(p.quantity)), 0),
+    inventoryWorth: products.reduce((acc, p) => acc + (p.discountedPrice * p.quantity), 0),
     totalSales: sales.reduce((acc, s) => acc + s.total, 0),
     totalCheckouts: sales.length,
     todaysIncome: sales
@@ -62,19 +62,29 @@ export const AppProvider = ({ children }) => {
   const addProduct = useCallback(async (productData) => {
     const timestamp = new Date().toISOString();
     const newProduct = {
-      id: uuidv4(),
-      ...productData,
-      barcode: productData.barcode || generateEAN13(),
-      createdAt: timestamp,
-      updatedAt: timestamp,
+        id: uuidv4(),
+        ...productData,
+        barcode: productData.barcode || generateEAN13(), // Ensure barcode is set
+        createdAt: timestamp,
+        updatedAt: timestamp,
     };
-    
+
+    console.log("addProduct: newProduct being prepared:", newProduct);
+
     const updatedProducts = [...products, newProduct];
-    setProducts(updatedProducts);
-    await saveProducts(updatedProducts);
-    await refreshData();
-    return newProduct;
-  }, [products, refreshData]);
+    console.log("addProduct: updatedProducts array:", updatedProducts);
+
+    try {
+        await saveProducts(updatedProducts);
+        console.log("addProduct: saveProducts successful.");
+        await refreshData();
+        console.log("addProduct: refreshData successful.");
+        return newProduct;
+    } catch (saveError) {
+        console.error("addProduct: Error during saveProducts or refreshData:", saveError);
+        throw saveError; // Re-throw to be caught by the component
+    }
+}, [products, refreshData]); // Ensure products is a dependency if you're spreading it directly
   
   const updateProduct = useCallback(async (updatedProduct) => {
     const updatedProducts = products.map(p => 
@@ -148,7 +158,7 @@ export const AppProvider = ({ children }) => {
   const checkout = useCallback(async (customerPhone) => {
     if (cart.length === 0) return;
     
-    const total = cart.reduce((acc, item) => acc + (item.retailPrice * item.cartQuantity), 0);
+    const total = cart.reduce((acc, item) => acc + (item.discountedPrice * item.cartQuantity), 0);
     
     const updatedProducts = products.map(product => {
       const cartItem = cart.find(item => item.id === product.id);
