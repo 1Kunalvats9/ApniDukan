@@ -64,7 +64,7 @@ export const AppProvider = ({ children }) => {
     const newProduct = {
         id: uuidv4(),
         ...productData,
-        barcode: productData.barcode || generateEAN13(), // Ensure barcode is set
+        barcode: productData.barcode || generateEAN13(), 
         createdAt: timestamp,
         updatedAt: timestamp,
     };
@@ -82,9 +82,9 @@ export const AppProvider = ({ children }) => {
         return newProduct;
     } catch (saveError) {
         console.error("addProduct: Error during saveProducts or refreshData:", saveError);
-        throw saveError; // Re-throw to be caught by the component
+        throw saveError; 
     }
-}, [products, refreshData]); // Ensure products is a dependency if you're spreading it directly
+}, [products, refreshData]); 
   
   const updateProduct = useCallback(async (updatedProduct) => {
     const updatedProducts = products.map(p => 

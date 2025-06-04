@@ -160,7 +160,7 @@ const Analytics = () => {
             ) : (
               <ul className="divide-y divide-slate-200">
                 {topProducts.map((product, index) => (
-                  <li key={product.id} className="p-4 hover:bg-slate-50">
+                  <li key={index} className="p-4 hover:bg-slate-50">
                     <div className="flex items-center">
                       <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-medium">
                         {index + 1}

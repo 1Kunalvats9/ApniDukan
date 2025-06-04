@@ -287,26 +287,24 @@ const AddProduct = () => {
                 id="name"
                 name="name"
                 className="input w-full"
-                value={searchQuery || formData.name} // Display search query or formData.name
+                value={searchQuery || formData.name} 
                 onChange={(e) => {
                   const { name, value } = e.target;
 
-                  // Always update formData.name first
                   setFormData(prev => ({ ...prev, [name]: value }));
 
-                  // Then, handle search logic based on the new value
-                  setSearchQuery(value); // Keep searchQuery in sync for display
-                  if (name === 'name') { // Ensure it's the name field
-                    debouncedSearch(value); // Debounce the search based on the new value
+                  setSearchQuery(value); 
+                  if (name === 'name') { 
+                    debouncedSearch(value);
                   }
                 }}
                 required
               />
               {searchResults.length > 0 && searchQuery && (
                 <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg">
-                  {searchResults.map((product) => (
+                  {searchResults.map((product,index) => (
                     <div
-                      key={product.id}
+                      key={index}
                       className="p-2 hover:bg-slate-50 cursor-pointer"
                       onClick={() => handleSelectProduct(product)}
                     >

@@ -137,8 +137,8 @@ const Dashboard = () => {
               <div className="p-6 text-center text-slate-500">No inventory alerts</div>
             ) : (
               <ul className="divide-y divide-slate-200">
-                {outOfStockProducts.map(product => (
-                  <li key={product.id} className="p-4 hover:bg-slate-50">
+                {outOfStockProducts.map((product,index) => (
+                  <li key={index} className="p-4 hover:bg-slate-50">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <p className="font-medium">{product.name}</p>
@@ -148,8 +148,8 @@ const Dashboard = () => {
                     </div>
                   </li>
                 ))}
-                {lowStockProducts.map(product => (
-                  <li key={product.id} className="p-4 hover:bg-slate-50">
+                {lowStockProducts.map((product,index) => (
+                  <li key={index} className="p-4 hover:bg-slate-50">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <p className="font-medium">{product.name}</p>

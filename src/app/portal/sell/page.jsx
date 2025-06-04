@@ -358,9 +358,9 @@ const SellPage = () => {
               </div>
             ) : (
               <ul className="divide-y divide-slate-200">
-                {searchResults.map(product => (
+                {searchResults.map((product,index) => (
                   <li
-                    key={product.id}
+                    key={index}
                     className="p-4 hover:bg-slate-50 cursor-pointer"
                     onClick={() => handleAddProduct(product)}
                   >
@@ -410,8 +410,8 @@ const SellPage = () => {
               </div>
             ) : (
               <div>
-                {cart.map(item => (
-                  <CartItem key={item.id} item={item} />
+                {cart.map((item,index) => (
+                  <CartItem key={index} item={item} />
                 ))}
               </div>
             )}

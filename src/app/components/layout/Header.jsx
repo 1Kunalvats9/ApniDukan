@@ -91,8 +91,8 @@ const Header = () => {
         {searchResults.length > 0 && searchQuery && (
           <div className="absolute top-full mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg animate-fade-in">
             <ul className="max-h-60 overflow-auto py-1">
-              {searchResults.map(product => (
-                <li key={product.id} className="px-4 py-2 hover:bg-slate-50">
+              {searchResults.map((product,index) => (
+                <li key={index} className="px-4 py-2 hover:bg-slate-50">
                   <div className="flex justify-between">
                     <span className="font-medium">{product.name}</span>
                     <span className="text-sm text-slate-500">₹{product.discountedPrice}</span>

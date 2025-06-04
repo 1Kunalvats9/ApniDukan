@@ -25,11 +25,37 @@ const isCacheValid = (key) => {
   return cache[key] !== null && (Date.now() - cache.lastUpdate) < CACHE_DURATION;
 };
 
+const migrateLocalStorageToLocalForage = async (key) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  const localStorageData = localStorage.getItem(key);
+  if (localStorageData) {
+    try {
+      console.log('entered to transffer the data-----------')
+      const parsedData = JSON.parse(localStorageData);
+      const localforageData = await localforage.getItem(key);
+      if (!localforageData || localforageData.length === 0) {
+        console.log(`Migrating '${key}' from localStorage to localForage.`);
+        await localforage.setItem(key, parsedData);
+        localStorage.removeItem(key); 
+        console.log(`Successfully migrated and removed '${key}' from localStorage.`);
+      } else {
+        console.log(`LocalForage already has data for '${key}'. Skipping migration from localStorage.`);
+      }
+    } catch (error) {
+      console.error(`Error migrating '${key}' from localStorage to localForage:`, error);
+    }
+  }
+};
+
 export const getProducts = async () => {
   try {
     if (isCacheValid('products')) {
       return cache.products;
     }
+
+    await migrateLocalStorageToLocalForage('products'); // Attempt migration first
 
     const products = await localforage.getItem('products');
     cache.products = products || [];
@@ -67,6 +93,8 @@ export const getCustomers = async () => {
       return cache.customers;
     }
 
+    await migrateLocalStorageToLocalForage('customers');
+
     const customers = await localforage.getItem('customers');
     cache.customers = customers || [];
     cache.lastUpdate = Date.now();
@@ -102,7 +130,7 @@ export const getSales = async () => {
     if (isCacheValid('sales')) {
       return cache.sales;
     }
-
+    await migrateLocalStorageToLocalForage('sales')
     const sales = await localforage.getItem('sales');
     cache.sales = sales || [];
     cache.lastUpdate = Date.now();
@@ -123,7 +151,6 @@ export const saveSales = async (sales) => {
   }
 };
 
-// Clear cache
 export const clearCache = () => {
   cache.products = null;
   cache.customers = null;
