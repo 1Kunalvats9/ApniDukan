@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation'; 
-import { LayoutDashboard, Package, PlusCircle, Users, ShoppingCart, Printer, BarChart, Store, LogOut, Database } from 'lucide-react';
+import { LayoutDashboard, Package, PlusCircle, Users, ShoppingCart, Printer, BarChart, Store, LogOut, Database, FileText } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 
 const Sidebar= () => {
@@ -15,7 +15,6 @@ const Sidebar= () => {
     logout(); 
     router.push('/'); 
   };
-
 
   const NavItem = ({ to, icon, label }) => {
     const isActive = pathname === to || (to !== '/portal' && pathname.startsWith(to + '/'));
@@ -70,6 +69,7 @@ const Sidebar= () => {
         <NavItem to="/portal/print-barcode" icon={<Printer size={20} />} label="Print Barcode" />
         <NavItem to="/portal/analytics" icon={<BarChart size={20} />} label="Analytics" />
         <NavItem to="/portal/backup" icon={<Database size={20} />} label="Backup & Restore" />
+        <NavItem to="/portal/parties" icon={<FileText size={20} />} label="Party Bills" />
       </nav>
       <div className='mb-4 ml-2 text-red-600 font-semibold cursor-pointer hover:border-red-500 border border-transparent p-2 duration-200 rounded-lg' onClick={handleLogout}>
         <button className='flex items-center cursor-pointer gap-2'>
