@@ -29,14 +29,21 @@ const SellPage = () => {
     const product = getProductByBarcode(barcode);
 
     if (product) {
-      addToCart(product, 1);
-      setScanFeedback(`Added ${product.name} to cart.`);
+      // Check if product has sufficient stock
+      const existingCartItem = cart.find(item => item.id === product.id);
+      const currentCartQuantity = existingCartItem ? existingCartItem.cartQuantity : 0;
+      
+      if (currentCartQuantity >= product.quantity) {
+        setScanFeedback(`Cannot add more ${product.name}. Insufficient stock (${product.quantity} available).`);
+      } else {
+        addToCart(product, 1);
+        setScanFeedback(`Added ${product.name} to cart.`);
+      }
     } else {
       setScanFeedback(`Product with barcode ${barcode} not found.`);
     }
     setTimeout(() => setScanFeedback(''), 2000);
-  }, [addToCart, getProductByBarcode]);
-
+  }, [addToCart, getProductByBarcode, cart]);
 
   useEffect(() => {
     const currentBarcodeInput = barcodeRef.current;
@@ -79,7 +86,6 @@ const SellPage = () => {
     }
   };
 
-
   useEffect(() => {
     if (searchQuery.trim()) {
       const results = products.filter(product =>
@@ -91,6 +97,7 @@ const SellPage = () => {
       setSearchResults([]);
     }
   }, [searchQuery, products]);
+  
   const handlePrintBill = useCallback(() => {
     if (cart.length === 0) {
       console.error("Cart is empty. Nothing to print!");
@@ -288,6 +295,15 @@ const SellPage = () => {
   };
 
   const handleAddProduct = (product) => {
+    // Check stock before adding
+    const existingCartItem = cart.find(item => item.id === product.id);
+    const currentCartQuantity = existingCartItem ? existingCartItem.cartQuantity : 0;
+    
+    if (currentCartQuantity >= product.quantity) {
+      alert(`Cannot add more ${product.name}. Insufficient stock (${product.quantity} available).`);
+      return;
+    }
+    
     addToCart(product, 1);
     setSearchQuery('');
     setSearchResults([]);
@@ -322,7 +338,7 @@ const SellPage = () => {
               maxLength={13}
             />
              {scanFeedback && (
-              <p className={`mt-2 text-sm ${scanFeedback.includes('not found') ? 'text-red-500' : 'text-green-600'}`}>
+              <p className={`mt-2 text-sm ${scanFeedback.includes('not found') || scanFeedback.includes('Cannot add') || scanFeedback.includes('Insufficient') ? 'text-red-500' : 'text-green-600'}`}>
                 {scanFeedback}
               </p>
             )}
@@ -368,6 +384,7 @@ const SellPage = () => {
                       <div>
                         <p className="font-medium">{product.name}</p>
                         <p className="text-xs text-slate-500">Barcode: {product.barcode}</p>
+                        <p className="text-xs text-slate-500">Stock: {product.quantity}</p>
                       </div>
                       <div className="flex items-center">
                         <span className="font-semibold mr-3">₹{product.discountedPrice}</span>
