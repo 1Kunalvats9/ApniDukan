@@ -19,6 +19,11 @@ const SellPage = () => {
   const currentInvoiceDateTimeRef = useRef(''); 
 
   const cartTotal = cart.reduce((total, item) => total + (item.discountedPrice * item.cartQuantity), 0);
+  
+  const totalSavings = cart.reduce((total, item) => {
+    const itemSavings = (item.originalPrice - item.discountedPrice) * item.cartQuantity;
+    return total + itemSavings;
+  }, 0);
 
   const processBarcode = useCallback((barcode) => {
     if (!barcode || barcode.length < 13) {
@@ -29,7 +34,6 @@ const SellPage = () => {
     const product = getProductByBarcode(barcode);
 
     if (product) {
-      // Check if product has sufficient stock
       const existingCartItem = cart.find(item => item.id === product.id);
       const currentCartQuantity = existingCartItem ? existingCartItem.cartQuantity : 0;
       
@@ -110,21 +114,17 @@ const SellPage = () => {
     const formattedDate = date.toLocaleDateString('en-IN');
     const formattedTime = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
     const totalAmount = cartTotal.toFixed(2); 
+    const savedMoney = totalSavings.toFixed(2); 
 
     let itemsHtml = cart.map(item => `
-        <tr style="font-size: 1.1rem; line-height: 1.4;">
-            <td style="padding: 2px 4px;">${item.name}</td>
-            <td style="padding: 2px 4px; text-align: right;">${item.cartQuantity}</td>
-            <td style="padding: 2px 4px; text-align: right;">₹${Number(item.discountedPrice).toFixed(2)}</td>
-            <td style="padding: 2px 4px; text-align: right;">₹${Number(item.originalPrice).toFixed(2)}</td>
-            <td style="padding: 2px 4px; text-align: right;">₹${(Number(item.discountedPrice) * Number(item.cartQuantity)).toFixed(2)}</td>
+        <tr style="font-size: 0.9rem; line-height: 1.2;">
+            <td style="padding: 1px 2px;">${item.name}</td>
+            <td style="padding: 1px 2px; text-align: right;">${item.cartQuantity}</td>
+            <td style="padding: 1px 2px; text-align: right;">₹${Number(item.originalPrice).toFixed(2)}</td>
+            <td style="padding: 1px 2px; text-align: right;">₹${Number(item.discountedPrice).toFixed(2)}</td>
+            <td style="padding: 1px 2px; text-align: right;">₹${(Number(item.discountedPrice) * Number(item.cartQuantity)).toFixed(2)}</td>
         </tr>
     `).join('');
-
-    const savedMoney = cart.reduce((item,idx,acc)=>{
-      return acc +(item.originalPrice - item.discountedPrice)*item.quantity
-    },0)
-
 
     const invoiceHtml = `
         <html>
@@ -132,39 +132,38 @@ const SellPage = () => {
             <title>Customer Invoice - Balaji Bachat Bazar</title>
             <style>
                 @page {
-                    size: 80mm auto; /* Common thermal printer width, height auto */
+                    size: 80mm auto;
                     margin: 0;
                 }
                 body {
-                    font-family: 'Space Mono', monospace; /* More industrial/receipt-like font */
+                    font-family: 'Space Mono', monospace;
                     margin: 0;
-                    padding: 10px; /* Padding for the entire receipt */
-                    font-size: 14px; /* Base font size, will be scaled */
+                    padding: 8px;
+                    font-size: 12px;
                     color: #000;
                 }
                 .container {
                     width: 100%;
-                    max-width: 80mm; /* Ensure it doesn't exceed thermal width */
+                    max-width: 80mm;
                     margin: 0 auto;
                 }
                 .text-center { text-align: center; }
-                .mb-6 { margin-bottom: 1rem; }
-                .mb-2 { margin-bottom: 0.5rem; }
-                .mt-6 { margin-top: 1rem; }
-                .mt-2 { margin-top: 0.5rem; }
+                .mb-6 { margin-bottom: 0.8rem; }
+                .mb-2 { margin-bottom: 0.3rem; }
+                .mt-6 { margin-top: 0.8rem; }
+                .mt-2 { margin-top: 0.3rem; }
                 .border-b { border-bottom: 1px solid #ccc; }
                 .border-t { border-top: 1px solid #ccc; }
-                .pb-2 { padding-bottom: 0.5rem; }
-                .pt-2 { padding-top: 0.5rem; }
+                .pb-2 { padding-bottom: 0.4rem; }
+                .pt-2 { padding-top: 0.4rem; }
                 .font-bold { font-weight: bold; }
                 
-                /* Larger, more industrial fonts */
-                .text-xxl { font-size: 2.2rem; } /* For shop name */
-                .text-xl { font-size: 1.8rem; } /* For total */
-                .text-lg { font-size: 1.4rem; } /* For section titles/important info */
-                .text-md { font-size: 1.2rem; } /* For general info */
-                .text-sm { font-size: 1.0rem; } /* For item details */
-                .text-xs { font-size: 0.9rem; } /* Smallest text, if needed */
+                .text-xxl { font-size: 1.8rem; } 
+                .text-xl { font-size: 1.4rem; } 
+                .text-lg { font-size: 1.1rem; } 
+                .text-md { font-size: 1.0rem; } 
+                .text-sm { font-size: 0.9rem; } 
+                .text-xs { font-size: 0.8rem; } 
 
                 .flex { display: flex; }
                 .justify-between { justify-content: space-between; }
@@ -172,33 +171,32 @@ const SellPage = () => {
                 table {
                     width: 100%;
                     border-collapse: collapse;
-                    margin-bottom: 1rem;
-                    page-break-inside: auto; /* Allow table rows to break across pages */
+                    margin-bottom: 0.8rem;
+                    page-break-inside: auto;
                 }
                 tr {
-                    page-break-inside: avoid; /* Keep rows together if possible */
+                    page-break-inside: avoid;
                     page-break-after: auto;
                 }
                 th, td {
-                    padding: 4px 0; /* Minimal padding for thermal print */
+                    padding: 2px 0;
                     text-align: left;
                     vertical-align: top;
                 }
                 th {
                     font-weight: bold;
                     border-bottom: 1px dashed #000;
-                    padding-bottom: 8px;
-                    font-size: 1.1rem; /* Slightly larger for headers */
+                    padding-bottom: 6px;
+                    font-size: 0.9rem; 
                 }
                 .text-right { text-align: right; }
-                .border-dashed { border-style: dashed !important; } /* For specific dashed lines */
+                .border-dashed { border-style: dashed !important; } 
 
-                /* Ensure barcode area has space if you decide to print it visually */
                 .barcode-area {
-                    margin-top: 1.5rem;
+                    margin-top: 1.2rem;
                     text-align: center;
-                    font-size: 2rem; /* Larger for barcode text */
-                    font-family: 'Code39', monospace; /* Example for barcode font if supported */
+                    font-size: 1.8rem;
+                    font-family: 'Code39', monospace;
                 }
             </style>
         </head>
@@ -211,19 +209,19 @@ const SellPage = () => {
                 </div>
 
                 <div class="mb-4 border-b pb-2 border-dashed">
-                    <p class="font-bold text-md">Customer: ${customerPhone || 'WALK-IN'}</p>
-                    <p class="font-bold text-md">Date: ${formattedDate}</p>
-                    <p class="font-bold text-md">Time: ${formattedTime}</p>
+                    <p class="font-bold text-sm">Customer: ${customerPhone || 'WALK-IN'}</p>
+                    <p class="font-bold text-sm">Date: ${formattedDate}</p>
+                    <p class="font-bold text-sm">Time: ${formattedTime}</p>
                 </div>
 
                 <table>
                     <thead>
                         <tr class="border-b border-dashed">
-                            <th style="font-size: 1.1rem; padding-right: 4px;">ITEM</th>
-                            <th style="text-align: right; font-size: 1.1rem; padding-left: 4px; padding-right: 4px;">QTY</th>
-                            <th style="text-align: right; font-size: 1.1rem; padding-left: 4px; padding-right: 4px;">MRP</th>
-                            <th style="text-align: right; font-size: 1.1rem; padding-left: 4px; padding-right: 4px;">Discounted</th>
-                            <th style="text-align: right; font-size: 1.1rem; padding-left: 4px;">TOTAL</th>
+                            <th style="font-size: 0.9rem; padding-right: 2px;">ITEM</th>
+                            <th style="text-align: right; font-size: 0.75rem; padding-left: 2px; padding-right: 2px;">QTY</th>
+                            <th style="text-align: right; font-size: 0.75rem; padding-left: 2px; padding-right: 2px;">MRP</th>
+                            <th style="text-align: right; font-size: 0.75rem; padding-left: 2px; padding-right: 2px;">Discounted</th>
+                            <th style="text-align: right; font-size: 0.75rem; padding-left: 2px;">TOTAL</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -233,7 +231,7 @@ const SellPage = () => {
 
                 <div class="text-right border-t pt-2 border-dashed">
                     <p class="text-xl font-bold">GRAND TOTAL: ₹${totalAmount}</p>
-                    <p class="text-xl font-bold">You Saved: ₹${savedMoney}</p>
+                    <p class="text-lg font-bold">You Saved: ₹${savedMoney}</p>
                 </div>
 
                 <div class="text-center mt-6">
@@ -258,7 +256,6 @@ const SellPage = () => {
 
     printWindow.onload = () => {
         printWindow.print();
-        // printWindow.onafterprint = () => printWindow.close();
         setIsPrinting(false);
     };
 
@@ -267,7 +264,7 @@ const SellPage = () => {
         setIsPrinting(false);
     };
 
-  }, [cart, cartTotal, customerPhone]); 
+  }, [cart, cartTotal, totalSavings, customerPhone]); 
 
   const handleCheckout = async () => {
     if (!customerPhone) {
@@ -301,7 +298,6 @@ const SellPage = () => {
   };
 
   const handleAddProduct = (product) => {
-    // Check stock before adding
     const existingCartItem = cart.find(item => item.id === product.id);
     const currentCartQuantity = existingCartItem ? existingCartItem.cartQuantity : 0;
     
@@ -445,6 +441,13 @@ const SellPage = () => {
               <span className="text-lg font-medium">Total</span>
               <span className="text-xl font-bold">₹{cartTotal.toFixed(2)}</span>
             </div>
+
+            {totalSavings > 0 && (
+              <div className="flex justify-between items-center mb-4 text-green-600">
+                <span className="text-lg font-medium">You Saved</span>
+                <span className="text-xl font-bold">₹{totalSavings.toFixed(2)}</span>
+              </div>
+            )}
 
             <div className="mb-4">
               <label htmlFor="customerPhone" className="label flex mb-3 items-center">
