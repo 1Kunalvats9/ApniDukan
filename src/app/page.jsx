@@ -23,7 +23,8 @@ const LandingPage = () => {
               <Store className="h-8 w-8 text-indigo-600" />
               <span className="ml-2 text-2xl font-bold text-slate-900">Apni Dukaan</span>
             </div>
-            <Link href={`${isLoggedIn ? "/portal/dashboard":"/login"}`} className="btn btn-primary">
+            {/* ${isLoggedIn ? "/portal/dashboard":"/login"} */}
+            <Link href={`/portal/dashboard`} className="btn btn-primary">
               Go to Dashboard
             </Link>
           </div>
