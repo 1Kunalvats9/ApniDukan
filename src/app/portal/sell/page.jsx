@@ -109,9 +109,15 @@ const SellPage = () => {
             <td style="padding: 2px 4px;">${item.name}</td>
             <td style="padding: 2px 4px; text-align: right;">${item.cartQuantity}</td>
             <td style="padding: 2px 4px; text-align: right;">₹${Number(item.discountedPrice).toFixed(2)}</td>
+            <td style="padding: 2px 4px; text-align: right;">₹${Number(item.originalPrice).toFixed(2)}</td>
             <td style="padding: 2px 4px; text-align: right;">₹${(Number(item.discountedPrice) * Number(item.cartQuantity)).toFixed(2)}</td>
         </tr>
     `).join('');
+
+    const savedMoney = cart.reduce((item,idx,acc)=>{
+      return acc +(item.originalPrice - item.discountedPrice)*item.quantity
+    },0)
+
 
     const invoiceHtml = `
         <html>
@@ -208,7 +214,8 @@ const SellPage = () => {
                         <tr class="border-b border-dashed">
                             <th style="font-size: 1.1rem; padding-right: 4px;">ITEM</th>
                             <th style="text-align: right; font-size: 1.1rem; padding-left: 4px; padding-right: 4px;">QTY</th>
-                            <th style="text-align: right; font-size: 1.1rem; padding-left: 4px; padding-right: 4px;">PRICE</th>
+                            <th style="text-align: right; font-size: 1.1rem; padding-left: 4px; padding-right: 4px;">MRP</th>
+                            <th style="text-align: right; font-size: 1.1rem; padding-left: 4px; padding-right: 4px;">Discounted</th>
                             <th style="text-align: right; font-size: 1.1rem; padding-left: 4px;">TOTAL</th>
                         </tr>
                     </thead>
@@ -219,6 +226,7 @@ const SellPage = () => {
 
                 <div class="text-right border-t pt-2 border-dashed">
                     <p class="text-xl font-bold">GRAND TOTAL: ₹${totalAmount}</p>
+                    <p class="text-xl font-bold">You Saved: ₹${savedMoney}</p>
                 </div>
 
                 <div class="text-center mt-6">
@@ -266,23 +274,21 @@ const SellPage = () => {
     }
 
     const orderDateISO = new Date().toISOString();
-    currentInvoiceDateTimeRef.current = orderDateISO; // Store timestamp for invoice
+    currentInvoiceDateTimeRef.current = orderDateISO; 
 
     try {
-      await checkout(customerPhone); // Your existing checkout logic
+      await checkout(customerPhone); 
       setCheckoutSuccess(true);
       setCustomerPhone('');
       setBarcodeInput('');
       barcodeRef.current?.focus();
 
-      // Delay printing slightly to allow state updates and visual feedback
       setTimeout(() => {
-        handlePrintBill(); // Trigger the print function after checkout
+        handlePrintBill();
         setCheckoutSuccess(false);
-      }, 500); // Small delay
+      }, 500); 
     } catch (error) {
       console.error("Error during checkout:", error);
-      // Handle checkout error feedback
       alert("Checkout failed. Please try again.");
     }
   };

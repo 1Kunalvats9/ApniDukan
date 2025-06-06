@@ -16,6 +16,7 @@ const cache = {
   products: null,
   customers: null,
   sales: null,
+  parties: null,
   lastUpdate: 0
 };
 
@@ -55,7 +56,7 @@ export const getProducts = async () => {
       return cache.products;
     }
 
-    await migrateLocalStorageToLocalForage('products'); // Attempt migration first
+    await migrateLocalStorageToLocalForage('products');
 
     const products = await localforage.getItem('products');
     cache.products = products || [];
@@ -151,9 +152,36 @@ export const saveSales = async (sales) => {
   }
 };
 
+export const getParties = async () => {
+  try {
+    if (isCacheValid('parties')) {
+      return cache.parties;
+    }
+    await migrateLocalStorageToLocalForage('parties')
+    const parties = await localforage.getItem('parties');
+    cache.parties = parties || [];
+    cache.lastUpdate = Date.now();
+    return cache.parties;
+  } catch (error) {
+    console.error('Error fetching parties:', error);
+    return cache.parties || [];
+  }
+};
+
+export const saveParties = async (parties) => {
+  try {
+    await localforage.setItem('parties', parties);
+    cache.parties = parties;
+    cache.lastUpdate = Date.now();
+  } catch (error) {
+    console.error('Error saving parties:', error);
+  }
+};
+
 export const clearCache = () => {
   cache.products = null;
   cache.customers = null;
   cache.sales = null;
+  cache.parties = null;
   cache.lastUpdate = 0;
 };
