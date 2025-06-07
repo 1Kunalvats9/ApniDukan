@@ -34,7 +34,7 @@ const SellPage = () => {
     const product = getProductByBarcode(barcode);
 
     if (product) {
-      const existingCartItem = cart.find(item => item.id === product.id);
+      const existingCartItem = cart.find(item => item.barcode === barcode); // Find by barcode
       const currentCartQuantity = existingCartItem ? existingCartItem.cartQuantity : 0;
       
       if (currentCartQuantity >= product.quantity) {
@@ -64,10 +64,9 @@ const SellPage = () => {
           return;
         }
 
+        // Only append key if the barcode input is focused
         if (e.key.match(/^\d$/) && (document.activeElement === currentBarcodeInput)) {
-          if (document.activeElement !== currentBarcodeInput) {
-             setBarcodeInput((prev) => prev + e.key);
-          }
+            setBarcodeInput((prev) => prev + e.key);
         }
       };
 

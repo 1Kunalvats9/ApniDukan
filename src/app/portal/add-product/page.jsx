@@ -1,415 +1,508 @@
 'use client';
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Barcode, Save, X, ScanLine } from 'lucide-react';
-import { useAppContext } from '../../../context/AppContext';
-import { generateEAN13, isValidEAN13 } from '../../../utils/barcodeGenerator';
-import BarcodeDisplay from '../../components/ui/BarcodeDisplay';
 
-const AddProduct = () => {
-  const { addProduct, getProductByBarcode, searchProducts } = useAppContext();
-  const [formData, setFormData] = useState({
-    name: '',
-    barcode: '',
-    originalPrice: '',
-    discountedPrice: '',
-    quantity: '1',
-  });
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [productExists, setProductExists] = useState(false);
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ShoppingBag, ScanLine, Plus, Phone, X, Check } from 'lucide-react';
+import { useAppContext } from '../../../context/AppContext';
+import CartItem from '../../components/ui/CartItem'; 
+
+const SellPage = () => {
+  const { products, cart, addToCart, clearCart, checkout, getProductByBarcode } = useAppContext();
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const [checkoutSuccess, setCheckoutSuccess] = useState(false);
+  const [scanFeedback, setScanFeedback] = useState('');
+  const [isPrinting, setIsPrinting] = useState(false); 
 
-  const barcodeInputRef = useRef(null);
+  const barcodeRef = useRef(null);
+  const currentInvoiceDateTimeRef = useRef(''); 
 
-  const debounce = (func, wait) => {
-    let timeout;
-    return (...args) => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => func(...args), wait);
-    };
-  };
+  const cartTotal = cart.reduce((total, item) => total + (item.discountedPrice * item.cartQuantity), 0);
+  
+  const totalSavings = cart.reduce((total, item) => {
+    const itemSavings = (item.originalPrice - item.discountedPrice) * item.cartQuantity;
+    return total + itemSavings;
+  }, 0);
 
-  const debouncedSearch = useCallback(
-    debounce((query) => {
-      if (query.length < 2) {
-        setSearchResults([]);
-        setIsSearching(false);
-        return;
-      }
-      setIsSearching(true);
-      const results = searchProducts(query);
-      setSearchResults(results.slice(0, 5));
-      setIsSearching(false);
-    }, 300),
-    [searchProducts]
-  );
-
-  const handleSearchChange = (e) => {
-    const query = e.target.value;
-    setSearchQuery(query);
-    if (e.target.name === 'name') {
-      debouncedSearch(query);
-    }
-  };
-
-  const handleSelectProduct = (product) => {
-    setFormData({
-      name: product.name,
-      barcode: product.barcode,
-      originalPrice: product.originalPrice.toString(),
-      discountedPrice: product.discountedPrice.toString(),
-      quantity: product.quantity.toString(),
-    });
-    setSearchQuery('');
-    setSearchResults([]);
-    setProductExists(true);
-    setError('');
-    setSuccess('');
-  };
-
-  const handleBarcodeInput = useCallback(async (barcode) => {
-    setError('');
-    setSuccess('');
-
-    if (!barcode) {
-      setProductExists(false);
-      setFormData(prev => ({
-        ...prev,
-        barcode: '',
-        name: '',
-        originalPrice: '',
-        discountedPrice: '',
-        quantity: '1'
-      }));
-      return;
-    }
-
-    if (!isValidEAN13(barcode)) {
-      setError('Invalid barcode format. Must be a valid EAN-13 barcode.');
-      setProductExists(false);
+  const processBarcode = useCallback((barcode) => {
+    // console.log('processBarcode called with:', barcode); // Debug Log
+    if (!barcode || barcode.length < 13) {
+      setScanFeedback('Invalid barcode length. Please scan a valid EAN-13.');
+      // console.log('Invalid barcode length.'); // Debug Log
       return;
     }
 
     const product = getProductByBarcode(barcode);
+    // console.log('getProductByBarcode returned:', product); // Debug Log
+
     if (product) {
-      setProductExists(true);
-      setFormData({
-        name: product.name,
-        barcode: product.barcode,
-        originalPrice: product.originalPrice.toString(),
-        discountedPrice: product.discountedPrice.toString(),
-        quantity: product.quantity.toString(),
-      });
-      setSearchQuery('');
-      setSearchResults([]);
+      const existingCartItem = cart.find(item => item.barcode === barcode); 
+      const currentCartQuantity = existingCartItem ? existingCartItem.cartQuantity : 0;
+      
+      // console.log('Product found:', product.name, 'Current cart quantity:', currentCartQuantity, 'Product stock:', product.quantity); // Debug Log
+
+      if (currentCartQuantity >= product.quantity) {
+        setScanFeedback(`Cannot add more ${product.name}. Insufficient stock (${product.quantity} available).`);
+        // console.log('Insufficient stock.'); // Debug Log
+      } else {
+        addToCart(product, 1);
+        setScanFeedback(`Added ${product.name} to cart.`);
+        // console.log(`Added ${product.name} to cart.`); // Debug Log
+        // console.log('Current Cart after addToCart (may not be updated immediately in this log):', cart); // Debug Log
+      }
     } else {
-      setProductExists(false);
-      setFormData(prev => ({
-        ...prev,
-        barcode,
-        originalPrice: '',
-        discountedPrice: '',
-        quantity: '1'
-      }));
+      setScanFeedback(`Product with barcode ${barcode} not found.`);
+      // console.log(`Product with barcode ${barcode} not found.`); // Debug Log
     }
-  }, [getProductByBarcode]);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    setError('');
-    setSuccess('');
-
-    if (name === 'barcode' && value.length === 13) {
-      handleBarcodeInput(value);
-    }
-  };
-
-  const handleGenerateBarcode = () => {
-    const newBarcode = generateEAN13();
-    setFormData(prev => ({ ...prev, barcode: newBarcode }));
-    setProductExists(false);
-    setError('');
-    setSuccess('');
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    console.log(formData)
-    try {
-      let finalBarcode = formData.barcode;
-
-      if (!finalBarcode) {
-        finalBarcode = generateEAN13();
-        setFormData(prev => ({ ...prev, barcode: finalBarcode }));
-      }
-
-      if (finalBarcode && !isValidEAN13(finalBarcode)) {
-        setError('Invalid barcode format. Must be a valid EAN-13 barcode.');
-        return;
-      }
-
-      if (!formData.name.trim()) {
-        setError('Product name cannot be empty.');
-        return;
-      }
-
-      await addProduct({
-        name: formData.name.trim(),
-        barcode: finalBarcode,
-        originalPrice: parseFloat(formData.originalPrice) || 0,
-        discountedPrice: parseFloat(formData.discountedPrice) || 0,
-        quantity: parseInt(formData.quantity) || 0,
-      });
-
-      setSuccess(`Product ${productExists ? 'updated' : 'added'} successfully!`);
-      setFormData({
-        name: '',
-        barcode: '',
-        originalPrice: '',
-        discountedPrice: '',
-        quantity: '1',
-      });
-      setSearchQuery('');
-      setSearchResults([]);
-      setProductExists(false);
-      setTimeout(() => setSuccess(''), 3000);
-      barcodeInputRef.current?.focus();
-    } catch (err) {
-      console.error("Error adding/updating product:", err);
-      setError('Failed to add/update product. Please try again.');
-    }
-  };
+    setTimeout(() => setScanFeedback(''), 2000);
+  }, [addToCart, getProductByBarcode, cart]);
 
   useEffect(() => {
-    const barcodeInput = barcodeInputRef.current;
-    if (barcodeInput) {
-      barcodeInput.focus();
+    const currentBarcodeInput = barcodeRef.current;
+    if (currentBarcodeInput) {
+      currentBarcodeInput.focus();
 
       const handleGlobalKeyDown = (e) => {
-        if (e.target.tagName === 'INPUT' && e.target.id !== 'barcode') {
-          return;
-        }
-        if (document.activeElement === barcodeInput || e.key.match(/^\d$/)) {
-          if (e.key === 'Enter' && barcodeInput.value.length === 13) {
-            e.preventDefault();
-            handleBarcodeInput(barcodeInput.value);
-          }
+        // console.log('Global keydown:', e.key, 'Target:', e.target, 'Focused:', currentBarcodeInput); // Debug Log
+        if (e.target === currentBarcodeInput && e.key === 'Enter') {
+          e.preventDefault(); 
+          // console.log('Enter key pressed on barcode input. Value:', currentBarcodeInput.value); // Debug Log
+          processBarcode(currentBarcodeInput.value);
+          setBarcodeInput(''); 
+          setScanFeedback(''); 
         }
       };
+
       document.addEventListener('keydown', handleGlobalKeyDown);
+
       return () => {
         document.removeEventListener('keydown', handleGlobalKeyDown);
       };
     }
-  }, [handleBarcodeInput]);
+  }, [processBarcode]); 
+
+  const handleBarcodeInputChange = (e) => {
+    // console.log('handleBarcodeInputChange - Input value:', e.target.value); // Debug Log
+    const value = e.target.value;
+    setBarcodeInput(value); 
+    setScanFeedback(''); 
+    if (value.length === 13) {
+      // console.log('Barcode input length is 13. Processing:', value); // Debug Log
+      processBarcode(value);
+      setBarcodeInput(''); 
+    }
+  };
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const results = products.filter(product =>
+        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.barcode.includes(searchQuery)
+      );
+      setSearchResults(results);
+    } else {
+      setSearchResults([]);
+    }
+  }, [searchQuery, products]);
+  
+  const handlePrintBill = useCallback(() => {
+    if (cart.length === 0) {
+      console.error("Cart is empty. Nothing to print!");
+      return;
+    }
+
+    setIsPrinting(true);
+
+    const date = new Date(currentInvoiceDateTimeRef.current || new Date());
+    const formattedDate = date.toLocaleDateString('en-IN');
+    const formattedTime = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    const totalAmount = cartTotal.toFixed(2); 
+    const savedMoney = totalSavings.toFixed(2); 
+
+    let itemsHtml = cart.map(item => `
+        <tr style="font-size: 0.9rem; line-height: 1.2;">
+            <td style="padding: 1px 2px;">${item.name}</td>
+            <td style="padding: 1px 2px; text-align: right;">${item.cartQuantity}</td>
+            <td style="padding: 1px 2px; text-align: right;">₹${Number(item.originalPrice).toFixed(2)}</td>
+            <td style="padding: 1px 2px; text-align: right;">₹${Number(item.discountedPrice).toFixed(2)}</td>
+            <td style="padding: 1px 2px; text-align: right;">₹${(Number(item.discountedPrice) * Number(item.cartQuantity)).toFixed(2)}</td>
+        </tr>
+    `).join('');
+
+    const invoiceHtml = `
+        <html>
+        <head>
+            <title>Customer Invoice - Balaji Bachat Bazar</title>
+            <style>
+                @page {
+                    size: 80mm auto;
+                    margin: 0;
+                }
+                body {
+                    font-family: 'Space Mono', monospace;
+                    margin: 0;
+                    padding: 8px;
+                    font-size: 12px;
+                    color: #000;
+                }
+                .container {
+                    width: 100%;
+                    max-width: 80mm;
+                    margin: 0 auto;
+                }
+                .text-center { text-align: center; }
+                .mb-6 { margin-bottom: 0.8rem; }
+                .mb-2 { margin-bottom: 0.3rem; }
+                .mt-6 { margin-top: 0.8rem; }
+                .mt-2 { margin-top: 0.3rem; }
+                .border-b { border-bottom: 1px solid #ccc; }
+                .border-t { border-top: 1px solid #ccc; }
+                .pb-2 { padding-bottom: 0.4rem; }
+                .pt-2 { padding-top: 0.4rem; }
+                .font-bold { font-weight: bold; }
+                
+                .text-xxl { font-size: 1.8rem; } 
+                .text-xl { font-size: 1.4rem; } 
+                .text-lg { font-size: 1.1rem; } 
+                .text-md { font-size: 1.0rem; } 
+                .text-sm { font-size: 0.9rem; } 
+                .text-xs { font-size: 0.8rem; } 
+
+                .flex { display: flex; }
+                .justify-between { justify-content: space-between; }
+                .items-center { align-items: center; }
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-bottom: 0.8rem;
+                    page-break-inside: auto;
+                }
+                tr {
+                    page-break-inside: avoid;
+                    page-break-after: auto;
+                }
+                th, td {
+                    padding: 2px 0;
+                    text-align: left;
+                    vertical-align: top;
+                }
+                th {
+                    font-weight: bold;
+                    border-bottom: 1px dashed #000;
+                    padding-bottom: 6px;
+                    font-size: 0.9rem; 
+                }
+                .text-right { text-align: right; }
+                .border-dashed { border-style: dashed !important; } 
+
+                .barcode-area {
+                    margin-top: 1.2rem;
+                    text-align: center;
+                    font-size: 1.8rem;
+                    font-family: 'Code39', monospace;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="text-center mb-6">
+                    <h1 class="text-xxl font-bold">BALAJI BACHAT BAZAR</h1>
+                    <p class="text-md">Contact: 9982171806</p>
+                    <p class="text-lg font-bold mt-2">SALES INVOICE</p>
+                </div>
+
+                <div class="mb-4 border-b pb-2 border-dashed">
+                    <p class="font-bold text-sm">Customer: ${customerPhone || 'WALK-IN'}</p>
+                    <p class="font-bold text-sm">Date: ${formattedDate}</p>
+                    <p class="font-bold text-sm">Time: ${formattedTime}</p>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr class="border-b border-dashed">
+                            <th style="font-size: 0.9rem; padding-right: 2px;">ITEM</th>
+                            <th style="text-align: right; font-size: 0.75rem; padding-left: 2px; padding-right: 2px;">QTY</th>
+                            <th style="text-align: right; font-size: 0.75rem; padding-left: 2px; padding-right: 2px;">MRP</th>
+                            <th style="text-align: right; font-size: 0.75rem; padding-left: 2px; padding-right: 2px;">Discounted</th>
+                            <th style="text-align: right; font-size: 0.75rem; padding-left: 2px;">TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${itemsHtml}
+                    </tbody>
+                </table>
+
+                <div class="text-right border-t pt-2 border-dashed">
+                    <p class="text-xl font-bold">GRAND TOTAL: ₹${totalAmount}</p>
+                    <p class="text-lg font-bold">You Saved: ₹${savedMoney}</p>
+                </div>
+
+                <div class="text-center mt-6">
+                    <p class="text-md font-bold">THANK YOU FOR YOUR PURCHASE!</p>
+                    <p class="text-sm mt-2">Visit Again!</p>
+                </div>
+            </div>
+        </body>
+        </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      console.error("Pop-up blocked! Please allow pop-ups for this site to print the bill.");
+      setIsPrinting(false);
+      return;
+    }
+
+    printWindow.document.write(invoiceHtml);
+    printWindow.document.close();
+    printWindow.focus();
+
+    printWindow.onload = () => {
+        printWindow.print();
+        setIsPrinting(false);
+    };
+
+    printWindow.onerror = (e) => {
+        console.error("Error loading print window content:", e);
+        setIsPrinting(false);
+    };
+
+  }, [cart, cartTotal, totalSavings, customerPhone]); 
+
+  const handleCheckout = async () => {
+    if (!customerPhone) {
+      alert('Please enter customer phone number');
+      return;
+    }
+
+    if (cart.length === 0) {
+      alert('Cart is empty');
+      return;
+    }
+
+    const orderDateISO = new Date().toISOString();
+    currentInvoiceDateTimeRef.current = orderDateISO; 
+
+    try {
+      await checkout(customerPhone); 
+      setCheckoutSuccess(true);
+      setCustomerPhone('');
+      setBarcodeInput('');
+      barcodeRef.current?.focus();
+
+      setTimeout(() => {
+        handlePrintBill();
+        setCheckoutSuccess(false);
+      }, 500); 
+    } catch (error) {
+      console.error("Error during checkout:", error);
+      alert("Checkout failed. Please try again.");
+    }
+  };
+
+  const handleAddProduct = (product) => {
+    const existingCartItem = cart.find(item => item.id === product.id);
+    const currentCartQuantity = existingCartItem ? existingCartItem.cartQuantity : 0;
+    
+    if (currentCartQuantity >= product.quantity) {
+      alert(`Cannot add more ${product.name}. Insufficient stock (${product.quantity} available).`);
+      return;
+    }
+    
+    addToCart(product, 1);
+    setSearchQuery('');
+    setSearchResults([]);
+    barcodeRef.current?.focus();
+  };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-900 mb-6">Add New Product</h1>
-
-      <div className="card mb-6 overflow-hidden">
-        <div className="p-4 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center">
-          <h2 className="text-lg font-medium text-indigo-900 flex items-center">
-            <ScanLine size={20} className="mr-2" />
-            Barcode Scanner Ready
-          </h2>
+    <div className="h-full flex flex-col lg:flex-row gap-6">
+      <div className="lg:w-1/2 flex flex-col">
+        <div className="card mb-4 overflow-hidden">
+          <div className="p-4 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center">
+            <h2 className="text-lg font-medium text-indigo-900 flex items-center">
+              <ScanLine size={20} className="mr-2" />
+              Scan Products
+            </h2>
+          </div>
+          <div className="p-6">
+            <div className="text-center mb-4">
+              <ScanLine size={48} className="mx-auto mb-3 text-slate-400" />
+              <p className="text-slate-600">Scan product barcode here.</p>
+              <p className="text-xs mt-2 text-slate-500">The input field below is always listening.</p>
+            </div>
+            {/* --- ADDED FORM TAG HERE TO PREVENT DEFAULT SUBMISSION --- */}
+            <form onSubmit={(e) => e.preventDefault()}> 
+              <input
+                type="text"
+                id="barcodeScannerInput"
+                ref={barcodeRef}
+                value={barcodeInput} // Controlled component
+                onChange={handleBarcodeInputChange} // Handles updating state and processing on 13 chars
+                className="input w-full text-center text-lg font-bold tracking-widest"
+                placeholder="Scan Barcode Here..."
+                autoFocus
+                maxLength={13}
+              />
+            </form> {/* --- END OF FORM TAG --- */}
+             {scanFeedback && (
+              <p className={`mt-2 text-sm ${scanFeedback.includes('not found') || scanFeedback.includes('Cannot add') || scanFeedback.includes('Insufficient') ? 'text-red-500' : 'text-green-600'}`}>
+                {scanFeedback}
+              </p>
+            )}
+          </div>
         </div>
-        <div className="p-6">
-          <div className="text-center">
-            <Barcode size={48} className="mx-auto mb-3 text-slate-400" />
-            <p className="text-slate-600">Simply scan a barcode, and it will auto-fill.</p>
-            <p className="text-xs mt-2 text-slate-500">The input field is always listening for barcode gun input.</p>
+
+        <div className="card flex-1">
+          <div className="p-4 border-b border-slate-200">
+            <h2 className="text-lg font-medium mb-2">Search Products</h2>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search by name or barcode..."
+                className="input w-full"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  onClick={() => setSearchQuery('')}
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="overflow-y-auto max-h-[30vh]">
+            {searchResults.length === 0 && searchQuery ? (
+              <div className="p-6 text-center text-slate-500">
+                No products found
+              </div>
+            ) : (
+              <ul className="divide-y divide-slate-200">
+                {searchResults.map((product,index) => (
+                  <li
+                    key={index}
+                    className="p-4 hover:bg-slate-50 cursor-pointer"
+                    onClick={() => handleAddProduct(product)}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-medium">{product.name}</p>
+                        <p className="text-xs text-slate-500">Barcode: {product.barcode}</p>
+                        <p className="text-xs text-slate-500">Stock: {product.quantity}</p>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="font-semibold mr-3">₹{product.discountedPrice}</span>
+                        <button className="btn btn-ghost p-1">
+                          <Plus size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       </div>
 
-      {productExists && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-6 animate-fade-in">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <Barcode size={20} className="text-yellow-500" />
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-yellow-800">Product already exists</h3>
-              <div className="mt-2 text-sm text-yellow-700">
-                <p>This product is already in your inventory. You can update its details.</p>
-              </div>
-            </div>
+      <div className="lg:w-1/2 flex flex-col">
+        <div className="card flex-1 overflow-hidden">
+          <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+            <h2 className="text-lg font-medium flex items-center">
+              <ShoppingBag size={20} className="mr-2" />
+              Shopping Cart
+            </h2>
+            {cart.length > 0 && (
+              <button
+                className="btn btn-outline text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
+                onClick={clearCart}
+              >
+                Clear Cart
+              </button>
+            )}
           </div>
-        </div>
-      )}
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6 animate-fade-in">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <X size={20} className="text-red-500" />
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Error</h3>
-              <div className="mt-2 text-sm text-red-700">
-                <p>{error}</p>
+          <div className="overflow-y-auto flex-1" style={{ maxHeight: 'calc(100vh - 380px)' }}>
+            {cart.length === 0 ? (
+              <div className="p-8 text-center text-slate-500">
+                <ShoppingBag size={48} className="mx-auto mb-4 text-slate-300" />
+                <p>Your cart is empty</p>
+                <p className="text-sm mt-2">Scan products or search to add items</p>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {success && (
-        <div className="bg-green-50 border border-green-200 rounded-md p-4 mb-6 animate-fade-in">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <Save size={20} className="text-green-500" />
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-green-800">Success</h3>
-              <div className="mt-2 text-sm text-green-700">
-                <p>{success}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="card">
-        <div className="p-4 border-b border-slate-200">
-          <h2 className="text-lg font-medium">Product Information</h2>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="md:col-span-2 relative">
-              <label htmlFor="name" className="label">Product Name</label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                className="input w-full"
-                value={searchQuery || formData.name} 
-                onChange={(e) => {
-                  const { name, value } = e.target;
-
-                  setFormData(prev => ({ ...prev, [name]: value }));
-
-                  setSearchQuery(value); 
-                  if (name === 'name') { 
-                    debouncedSearch(value);
-                  }
-                }}
-                required
-              />
-              {searchResults.length > 0 && searchQuery && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg">
-                  {searchResults.map((product,index) => (
-                    <div
-                      key={index}
-                      className="p-2 hover:bg-slate-50 cursor-pointer"
-                      onClick={() => handleSelectProduct(product)}
-                    >
-                      <div className="font-medium">{product.name}</div>
-                      <div className="text-sm text-slate-500">
-                        Barcode: {product.barcode} | Price: ₹{product.discountedPrice}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="barcode" className="label">Barcode (EAN-13)</label>
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  id="barcode"
-                  name="barcode"
-                  className="input flex-1"
-                  value={formData.barcode}
-                  onChange={handleChange}
-                  placeholder="Scan or enter barcode"
-                  maxLength={13}
-                  ref={barcodeInputRef}
-                  required={!formData.name}
-                />
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={handleGenerateBarcode}
-                >
-                  Generate
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="quantity" className="label">Quantity</label>
-              <input
-                type="number"
-                id="quantity"
-                name="quantity"
-                className="input w-full"
-                value={formData.quantity}
-                onChange={handleChange}
-                min="0"
-                required
-              />
-            </div>
-
-            <div>
-              <label htmlFor="originalPrice" className="label">Original Price (₹)</label>
-              <input
-                type="number"
-                id="originalPrice"
-                name="originalPrice"
-                className="input w-full"
-                value={formData.originalPrice}
-                onChange={handleChange}
-                min="0"
-                step="0.01"
-                required
-              />
-            </div>
-
-            <div>
-              <label htmlFor="discountedPrice" className="label">Discounted Price (₹)</label>
-              <input
-                type="number"
-                id="discountedPrice"
-                name="discountedPrice"
-                className="input w-full"
-                value={formData.discountedPrice}
-                onChange={handleChange}
-                min="0"
-                step="0.01"
-                required
-              />
-            </div>
-
-            {formData.barcode && isValidEAN13(formData.barcode) && (
-              <div className="md:col-span-2">
-                <label className="label">Barcode Preview</label>
-                <div className="mt-2 border border-slate-200 rounded-md overflow-hidden">
-                  <BarcodeDisplay value={formData.barcode} />
-                </div>
+            ) : (
+              <div>
+                {cart.map((item,index) => (
+                  <CartItem key={index} item={item} />
+                ))}
               </div>
             )}
           </div>
 
-          <div className="mt-8 flex justify-end">
+          <div className="p-4 border-t border-slate-200 bg-white">
+            <div className="flex justify-between items-center mb-4">
+              <span className="text-lg font-medium">Total</span>
+              <span className="text-xl font-bold">₹{cartTotal.toFixed(2)}</span>
+            </div>
+
+            {totalSavings > 0 && (
+              <div className="flex justify-between items-center mb-4 text-green-600">
+                <span className="text-lg font-medium">You Saved</span>
+                <span className="text-xl font-bold">₹{totalSavings.toFixed(2)}</span>
+              </div>
+            )}
+
+            <div className="mb-4">
+              <label htmlFor="customerPhone" className="label flex mb-3 items-center">
+                <Phone size={16} className="mr-1" />
+                Customer Phone
+              </label>
+              <input
+                type="tel"
+                id="customerPhone"
+                className="input w-full"
+                placeholder="Enter customer phone number"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                pattern="[0-9]{10}"
+                required
+              />
+            </div>
+
             <button
-              type="submit"
-              className="btn btn-primary"
+              className="btn btn-primary w-full py-3"
+              onClick={handleCheckout}
+              disabled={cart.length === 0 || !customerPhone}
             >
-              <Save size={16} className="mr-2" />
-              {productExists ? 'Update Product' : 'Add Product'}
+              Checkout
             </button>
           </div>
-        </form>
+        </div>
       </div>
+
+      {checkoutSuccess && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-scale-in p-6 text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Check size={32} className="text-green-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-green-600 mb-2">Checkout Successful!</h2>
+            <p className="text-slate-600 mb-6">The sale has been recorded successfully.</p>
+            <button
+              className="btn btn-primary w-full"
+              onClick={() => setCheckoutSuccess(false)}
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default AddProduct;
+export default SellPage;
