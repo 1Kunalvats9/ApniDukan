@@ -26,31 +26,20 @@ const SellPage = () => {
   }, 0);
 
   const processBarcode = useCallback((barcode) => {
-    console.log('Processing barcode:', barcode);
-    
     if (!barcode || barcode.length < 13) {
       setScanFeedback('Invalid barcode length. Please scan a valid EAN-13.');
       return;
     }
 
-    // Find the product by barcode
     const product = getProductByBarcode(barcode);
-    console.log('Product found:', product);
 
     if (product) {
-      // Check if this exact product (by barcode) is already in cart
       const existingCartItem = cart.find(item => item.barcode === barcode);
       const currentCartQuantity = existingCartItem ? existingCartItem.cartQuantity : 0;
       
-      console.log('Existing cart item:', existingCartItem);
-      console.log('Current cart quantity:', currentCartQuantity);
-      console.log('Product stock:', product.quantity);
-
-      // Check if we can add more of this product
       if (currentCartQuantity >= product.quantity) {
         setScanFeedback(`Cannot add more ${product.name}. Insufficient stock (${product.quantity} available).`);
       } else {
-        // Add the product to cart (this will either add new item or increase quantity of existing item)
         addToCart(product, 1);
         setScanFeedback(`Added ${product.name} to cart. ${existingCartItem ? 'Quantity increased.' : 'New item added.'}`);
       }
@@ -58,43 +47,36 @@ const SellPage = () => {
       setScanFeedback(`Product with barcode ${barcode} not found.`);
     }
     
-    // Clear feedback after 3 seconds
     setTimeout(() => setScanFeedback(''), 3000);
   }, [addToCart, getProductByBarcode, cart]);
 
-  // Enhanced keyboard event handling for barcode scanning
   useEffect(() => {
     const currentBarcodeInput = barcodeRef.current;
     if (currentBarcodeInput) {
-      // Always keep focus on barcode input
       currentBarcodeInput.focus();
 
       const handleGlobalKeyDown = (e) => {
-        // If Enter is pressed and barcode input is focused
         if (e.key === 'Enter' && document.activeElement === currentBarcodeInput) {
           e.preventDefault();
           const scannedBarcode = currentBarcodeInput.value.trim();
           if (scannedBarcode) {
             processBarcode(scannedBarcode);
-            setBarcodeInput(''); // Clear input after processing
-            currentBarcodeInput.focus(); // Keep focus
+            setBarcodeInput('');
+            currentBarcodeInput.focus();
           }
           return;
         }
 
-        // Auto-focus barcode input when digits are typed (unless user is typing in other inputs)
         if (e.key.match(/^\d$/) && 
             document.activeElement !== currentBarcodeInput && 
             !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
           currentBarcodeInput.focus();
-          setBarcodeInput(e.key); // Start with the typed digit
+          setBarcodeInput(e.key);
           e.preventDefault();
         }
       };
 
-      // Handle focus events to ensure barcode input stays focused
       const handleFocusOut = (e) => {
-        // If focus moves away from barcode input and it's not to another input field, refocus
         setTimeout(() => {
           if (document.activeElement && 
               !['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement.tagName)) {
@@ -118,7 +100,6 @@ const SellPage = () => {
     setBarcodeInput(value);
     setScanFeedback('');
     
-    // Auto-process when 13 digits are entered (typical for EAN-13)
     if (value.length === 13) {
       processBarcode(value);
       setBarcodeInput('');
@@ -473,7 +454,8 @@ const SellPage = () => {
             ) : (
               <div>
                 {cart.map((item, index) => (
-                  <CartItem key={`${item.barcode}-${index}`} item={item} />
+                  console.log(item),
+                  <CartItem key={item.id} item={item} />
                 ))}
               </div>
             )}

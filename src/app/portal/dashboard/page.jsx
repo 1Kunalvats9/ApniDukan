@@ -28,7 +28,6 @@ const Dashboard = () => {
       router.push('/')
     }
   },[])
-  console.log(analytics,products)
 
   return (
     <div className="space-y-6">

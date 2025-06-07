@@ -24,14 +24,33 @@ export const AppProvider = ({ children }) => {
       .reduce((acc, s) => acc + s.total, 0),
   };
 
+  const ensureProductIds = useCallback(async (productsData) => {
+    let changed = false;
+    const updatedProducts = productsData.map(p => {
+      if (!p.id) {
+        changed = true;
+        return { ...p, id: uuidv4() };
+      }
+      return p;
+    });
+
+    if (changed) {
+      await saveProducts(updatedProducts);
+      return updatedProducts;
+    }
+    return productsData;
+  }, []);
+
   const refreshData = useCallback(async () => {
     try {
-      const [productsData, customersData, salesData] = await Promise.all([
+      let [productsData, customersData, salesData] = await Promise.all([
         getProducts(),
         getCustomers(),
         getSales(),
       ]);
       
+      productsData = await ensureProductIds(productsData);
+
       setProducts(productsData);
       setCustomers(customersData);
       setSales(salesData);
@@ -39,7 +58,7 @@ export const AppProvider = ({ children }) => {
     } catch (error) {
       console.error('Error refreshing data:', error);
     }
-  }, []);
+  }, [ensureProductIds]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -54,7 +73,6 @@ export const AppProvider = ({ children }) => {
     
     loadData();
 
-    // Set up periodic refresh every 5 minutes
     const refreshInterval = setInterval(refreshData, 300000);
     return () => clearInterval(refreshInterval);
   }, [refreshData]);
@@ -69,19 +87,13 @@ export const AppProvider = ({ children }) => {
         updatedAt: timestamp,
     };
 
-    console.log("addProduct: newProduct being prepared:", newProduct);
-
     const updatedProducts = [...products, newProduct];
-    console.log("addProduct: updatedProducts array:", updatedProducts);
 
     try {
         await saveProducts(updatedProducts);
-        console.log("addProduct: saveProducts successful.");
         await refreshData();
-        console.log("addProduct: refreshData successful.");
         return newProduct;
     } catch (saveError) {
-        console.error("addProduct: Error during saveProducts or refreshData:", saveError);
         throw saveError; 
     }
 }, [products, refreshData]); 
@@ -119,20 +131,22 @@ export const AppProvider = ({ children }) => {
     );
   }, [products]);
   
-  const addToCart = useCallback((product, quantity = 1) => {
-    const existingItem = cart.find(item => item.id === product.id);
+  const addToCart = useCallback((productToAdd, quantity = 1) => {
+    setCart(prevCart => {
+      const existingItemIndex = prevCart.findIndex(item => item.barcode === productToAdd.barcode);
     
-    if (existingItem) {
-      const updatedCart = cart.map(item => 
-        item.id === product.id 
-          ? { ...item, cartQuantity: item.cartQuantity + quantity } 
-          : item
-      );
-      setCart(updatedCart);
-    } else {
-      setCart(prevCart => [...prevCart, { ...product, cartQuantity: quantity }]);
-    }
-  }, [cart]);
+      if (existingItemIndex > -1) {
+        const updatedCart = [...prevCart];
+        updatedCart[existingItemIndex] = {
+          ...updatedCart[existingItemIndex],
+          cartQuantity: updatedCart[existingItemIndex].cartQuantity + quantity
+        };
+        return updatedCart;
+      } else {
+        return [...prevCart, { ...productToAdd, cartQuantity: quantity }];
+      }
+    });
+  }, []);
   
   const updateCartItem = useCallback((id, quantity) => {
     if (quantity <= 0) {
@@ -161,7 +175,7 @@ export const AppProvider = ({ children }) => {
     const total = cart.reduce((acc, item) => acc + (item.discountedPrice * item.cartQuantity), 0);
     
     const updatedProducts = products.map(product => {
-      const cartItem = cart.find(item => item.id === product.id);
+      const cartItem = cart.find(item => item.id === product.id); 
       if (cartItem) {
         return {
           ...product,
@@ -239,6 +253,7 @@ export const AppProvider = ({ children }) => {
     checkout,
     refreshData,
     loading,
+    ensureProductIds
   };
   
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -5,7 +5,7 @@ import { Save, RotateCcw, Database } from 'lucide-react';
 import { useAppContext } from '../../../context/AppContext';
 
 const BackupPage = () => {
-  const { products, customers, sales, refreshData } = useAppContext();
+  const { products, customers, sales, refreshData , ensureProductIds } = useAppContext();
   const [backupEmail, setBackupEmail] = useState('');
   const [backupPassword, setBackupPassword] = useState('');
   const [restoreEmail, setRestoreEmail] = useState('');
@@ -13,6 +13,7 @@ const BackupPage = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [transferLoading, setTransferLoading] = useState(false);
+  const [ensureIdLoading, setEnsureIdLoading] = useState(false); // New loading state for this specific action
 
   const handleBackup = async (e) => {
     e.preventDefault();
@@ -107,6 +108,21 @@ const BackupPage = () => {
     }
   };
 
+  const handleEnsureIds = async () => {
+    setEnsureIdLoading(true);
+    setMessage('');
+    try {
+      // Pass the current 'products' state to the ensureProductIds function
+      await ensureProductIds(products); 
+      setMessage('Product IDs checked and generated where missing!');
+    } catch (error) {
+      console.error('Error ensuring product IDs:', error);
+      setMessage('Failed to ensure product IDs. Please try again.');
+    } finally {
+      setEnsureIdLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-slate-900">Data Management</h1>
@@ -116,6 +132,15 @@ const BackupPage = () => {
           {message}
         </div>
       )}
+
+      {/* Button to run ensureProductIds */}
+      <button 
+        className='btn btn-secondary mb-4' 
+        onClick={handleEnsureIds} 
+        disabled={ensureIdLoading}
+      >
+        {ensureIdLoading ? 'Updating IDs...' : 'Ensure Product IDs'}
+      </button>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="card">

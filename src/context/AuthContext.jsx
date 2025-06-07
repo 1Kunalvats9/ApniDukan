@@ -21,51 +21,8 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // const checkAuth = async () => {
-  //   console.log('[AuthContext] checkAuth function called.');
-  //   const token = localStorage.getItem('token');
-  //   if (!token) {
-  //     console.log('[AuthContext] checkAuth: No token, skipping API call, setting loading to false.');
-  //     setLoading(false);
-  //     return;
-  //   }
-
-  //   try {
-  //     console.log('[AuthContext] checkAuth: Fetching /api/auth/me...');
-  //     const response = await fetch('/api/auth/me', {
-  //       method: 'GET',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //         'Authorization': `Bearer ${token}`,
-  //       },
-  //     });
-
-  //     console.log('[AuthContext] checkAuth: /api/auth/me response status:', response.status);
-
-  //     if (!response.ok) {
-  //       const errorData = await response.json();
-  //       console.error('[AuthContext] checkAuth: API error (non-200 status):', errorData.message || response.statusText);
-  //       throw new Error(errorData.message || 'Authentication failed');
-  //     }
-
-  //     const data = await response.json();
-  //     console.log('[AuthContext] checkAuth: API success, received data:', data);
-  //     // --- FIX: Change setUser(data) to setUser(data.user) ---
-  //     // Now /api/auth/me returns { user: {...} }
-  //     setUser(data.user);
-  //   } catch (error) {
-  //     console.error('[AuthContext] checkAuth: Error during API call or processing:', error);
-  //     localStorage.removeItem('token');
-  //     localStorage.removeItem('user'); // Also remove user data if stored separately
-  //     setUser(null);
-  //   } finally {
-  //     console.log('[AuthContext] checkAuth: Setting loading to false in finally block.');
-  //     setLoading(false);
-  //   }
-  // };
 
   const login = async (email, password) => {
-    // ... (rest of login function)
     const response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: {
@@ -81,13 +38,12 @@ export const AuthProvider = ({ children }) => {
 
     const data = await response.json();
     localStorage.setItem('token', data.token);
-    localStorage.setItem('user', JSON.stringify(data.user)); // Store user data after successful login
-    setUser(data.user); // Update context user state
+    localStorage.setItem('user', JSON.stringify(data.user)); 
+    setUser(data.user); 
     setLoading(false)
   };
 
   const signup = async (userData) => {
-    // ... (rest of signup function)
     const response = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: {
@@ -103,16 +59,14 @@ export const AuthProvider = ({ children }) => {
 
     const data = await response.json();
     localStorage.setItem('token', data.token);
-    localStorage.setItem('user', JSON.stringify(data.user)); // Store user data after successful signup
-    setUser(data.user); // Update context user state
+    localStorage.setItem('user', JSON.stringify(data.user)); 
+    setUser(data.user); 
   };
 
   const logout = () => {
-    console.log('[AuthContext] Logging out.');
     localStorage.removeItem('token');
-    localStorage.removeItem('user'); // Clear user data from localStorage
-    setUser(null); // Clear user state
-    // Optionally, redirect the user after logout, e.g., router.push('/')
+    localStorage.removeItem('user'); 
+    setUser(null); 
   };
 
   console.log('[AuthContext] Render - User:', user, 'Loading:', loading);
