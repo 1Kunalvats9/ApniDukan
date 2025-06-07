@@ -31,6 +31,11 @@ export const AppProvider = ({ children }) => {
         changed = true;
         return { ...p, id: uuidv4() };
       }
+      // Ensure unit field exists
+      if (!p.unit) {
+        changed = true;
+        return { ...p, unit: 'pc' }; // Default to piece
+      }
       return p;
     });
 
@@ -83,6 +88,7 @@ export const AppProvider = ({ children }) => {
         id: uuidv4(),
         ...productData,
         barcode: productData.barcode || generateEAN13(), 
+        unit: productData.unit || 'pc', // Ensure unit is set
         createdAt: timestamp,
         updatedAt: timestamp,
     };
@@ -131,9 +137,12 @@ export const AppProvider = ({ children }) => {
     );
   }, [products]);
   
-  const addToCart = useCallback((productToAdd, quantity = 1) => {
+  const addToCart = useCallback((productToAdd, quantity = 1, unit = null) => {
     setCart(prevCart => {
-      const existingItemIndex = prevCart.findIndex(item => item.barcode === productToAdd.barcode);
+      const effectiveUnit = unit || productToAdd.unit || 'pc';
+      const existingItemIndex = prevCart.findIndex(item => 
+        item.barcode === productToAdd.barcode && item.unit === effectiveUnit
+      );
     
       if (existingItemIndex > -1) {
         const updatedCart = [...prevCart];
@@ -143,12 +152,16 @@ export const AppProvider = ({ children }) => {
         };
         return updatedCart;
       } else {
-        return [...prevCart, { ...productToAdd, cartQuantity: quantity }];
+        return [...prevCart, { 
+          ...productToAdd, 
+          cartQuantity: quantity,
+          unit: effectiveUnit
+        }];
       }
     });
   }, []);
   
-  const updateCartItem = useCallback((id, quantity) => {
+  const updateCartItem = useCallback((id, quantity, unit = null) => {
     if (quantity <= 0) {
       removeFromCart(id);
       return;
@@ -156,7 +169,11 @@ export const AppProvider = ({ children }) => {
     
     setCart(prevCart => 
       prevCart.map(item => 
-        item.id === id ? { ...item, cartQuantity: quantity } : item
+        item.id === id ? { 
+          ...item, 
+          cartQuantity: quantity,
+          unit: unit || item.unit
+        } : item
       )
     );
   }, []);

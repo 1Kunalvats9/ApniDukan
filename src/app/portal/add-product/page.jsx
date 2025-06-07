@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Package, ScanLine, Plus, Save, X, Check } from 'lucide-react';
 import { useAppContext } from '../../../context/AppContext';
 import { generateEAN13, isValidEAN13 } from '../../../utils/barcodeGenerator';
+import { UNITS, getUnitsByType, UNIT_TYPES } from '../../../utils/units';
 import BarcodeDisplay from '../../components/ui/BarcodeDisplay';
 
 const AddProductPage = () => {
@@ -13,7 +14,8 @@ const AddProductPage = () => {
     originalPrice: '',
     discountedPrice: '',
     quantity: '',
-    barcode: ''
+    barcode: '',
+    unit: 'pc' // Default unit
   });
   const [barcodeInput, setBarcodeInput] = useState('');
   const [scanFeedback, setScanFeedback] = useState('');
@@ -117,7 +119,7 @@ const AddProductPage = () => {
 
       const originalPrice = parseFloat(formData.originalPrice);
       const discountedPrice = parseFloat(formData.discountedPrice);
-      const quantity = parseInt(formData.quantity);
+      const quantity = parseFloat(formData.quantity);
 
       if (originalPrice <= 0) {
         throw new Error('Original price must be greater than 0');
@@ -146,7 +148,8 @@ const AddProductPage = () => {
         originalPrice,
         discountedPrice,
         quantity,
-        barcode: formData.barcode
+        barcode: formData.barcode,
+        unit: formData.unit
       };
 
       await addProduct(productData);
@@ -158,7 +161,8 @@ const AddProductPage = () => {
         originalPrice: '',
         discountedPrice: '',
         quantity: '',
-        barcode: ''
+        barcode: '',
+        unit: 'pc'
       });
       setBarcodeInput('');
       setUseScannedBarcode(false);
@@ -175,6 +179,8 @@ const AddProductPage = () => {
       setLoading(false);
     }
   };
+
+  const selectedUnit = UNITS[Object.keys(UNITS).find(key => UNITS[key].id === formData.unit)];
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -296,9 +302,52 @@ const AddProductPage = () => {
               />
             </div>
 
+            <div>
+              <label htmlFor="unit" className="label">Unit Type *</label>
+              <select
+                id="unit"
+                name="unit"
+                className="input w-full"
+                value={formData.unit}
+                onChange={handleInputChange}
+                required
+              >
+                <optgroup label="Piece Units">
+                  {getUnitsByType(UNIT_TYPES.PIECE).map(unit => (
+                    <option key={unit.id} value={unit.id}>
+                      {unit.name} ({unit.symbol})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Weight Units">
+                  {getUnitsByType(UNIT_TYPES.WEIGHT).map(unit => (
+                    <option key={unit.id} value={unit.id}>
+                      {unit.name} ({unit.symbol})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Volume Units">
+                  {getUnitsByType(UNIT_TYPES.VOLUME).map(unit => (
+                    <option key={unit.id} value={unit.id}>
+                      {unit.name} ({unit.symbol})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Length Units">
+                  {getUnitsByType(UNIT_TYPES.LENGTH).map(unit => (
+                    <option key={unit.id} value={unit.id}>
+                      {unit.name} ({unit.symbol})
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="originalPrice" className="label">Original Price (₹) *</label>
+                <label htmlFor="originalPrice" className="label">
+                  Original Price (₹) per {selectedUnit?.symbol || 'unit'} *
+                </label>
                 <input
                   type="number"
                   id="originalPrice"
@@ -314,7 +363,9 @@ const AddProductPage = () => {
               </div>
 
               <div>
-                <label htmlFor="discountedPrice" className="label">Selling Price (₹) *</label>
+                <label htmlFor="discountedPrice" className="label">
+                  Selling Price (₹) per {selectedUnit?.symbol || 'unit'} *
+                </label>
                 <input
                   type="number"
                   id="discountedPrice"
@@ -331,7 +382,9 @@ const AddProductPage = () => {
             </div>
 
             <div>
-              <label htmlFor="quantity" className="label">Initial Quantity *</label>
+              <label htmlFor="quantity" className="label">
+                Initial Stock ({selectedUnit?.symbol || 'units'}) *
+              </label>
               <input
                 type="number"
                 id="quantity"
@@ -341,6 +394,7 @@ const AddProductPage = () => {
                 onChange={handleInputChange}
                 placeholder="0"
                 min="0"
+                step={selectedUnit?.type === 'weight' ? '0.1' : '1'}
                 required
               />
             </div>
@@ -348,7 +402,7 @@ const AddProductPage = () => {
             {formData.originalPrice && formData.discountedPrice && (
               <div className="bg-slate-50 rounded-lg p-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Discount:</span>
+                  <span className="text-sm text-slate-600">Discount per {selectedUnit?.symbol || 'unit'}:</span>
                   <span className="font-medium">
                     {formData.originalPrice > formData.discountedPrice
                       ? `₹${(parseFloat(formData.originalPrice) - parseFloat(formData.discountedPrice)).toFixed(2)} (${Math.round(((parseFloat(formData.originalPrice) - parseFloat(formData.discountedPrice)) / parseFloat(formData.originalPrice)) * 100)}%)`

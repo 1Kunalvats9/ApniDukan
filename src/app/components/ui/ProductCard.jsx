@@ -1,15 +1,25 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Edit, Trash2, ShoppingCart } from 'lucide-react';
+import { Edit, Trash2, ShoppingCart, Scale } from 'lucide-react';
 import { useAppContext } from '../../../context/AppContext';
+import { getUnitById, getCommonWeights, formatQuantityWithUnit } from '../../../utils/units';
 
 const ProductCard = ({ product, onEdit }) => {
   const { addToCart, deleteProduct } = useAppContext();
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showWeightSelector, setShowWeightSelector] = useState(false);
 
-  const handleAddToCart = () => {
-    addToCart(product, 1);
+  const unit = getUnitById(product.unit || 'pc');
+  const isWeightUnit = unit?.type === 'weight';
+
+  const handleAddToCart = (quantity = 1, selectedUnit = product.unit || 'pc') => {
+    addToCart(product, quantity, selectedUnit);
+    setShowWeightSelector(false);
+  };
+
+  const handleWeightSelect = (weight) => {
+    handleAddToCart(weight, 'kg');
   };
 
   const handleDelete = async () => {
@@ -30,7 +40,7 @@ const ProductCard = ({ product, onEdit }) => {
   const discountPercent = calculateDiscount();
 
   return (
-    <div className="card overflow-hidden animate-fade-in">
+    <div className="card overflow-hidden animate-fade-in relative">
       <div className="p-4">
         <div className="flex justify-between items-start">
           <div>
@@ -47,6 +57,7 @@ const ProductCard = ({ product, onEdit }) => {
           {product.originalPrice > product.discountedPrice && (
             <span className="ml-2 text-sm text-slate-500 line-through">₹{product.originalPrice}</span>
           )}
+          <span className="ml-1 text-xs text-slate-500">per {unit?.symbol || 'pc'}</span>
         </div>
 
         <div className="mt-2 flex justify-between items-center">
@@ -57,7 +68,10 @@ const ProductCard = ({ product, onEdit }) => {
                 ? 'text-yellow-600'
                 : 'text-red-600'
           }`}>
-            {product.quantity > 0 ? `In stock: ${product.quantity}` : 'Out of stock'}
+            {product.quantity > 0 
+              ? `In stock: ${formatQuantityWithUnit(product.quantity, product.unit || 'pc')}` 
+              : 'Out of stock'
+            }
           </span>
         </div>
       </div>
@@ -78,14 +92,53 @@ const ProductCard = ({ product, onEdit }) => {
           </button>
         </div>
 
-        <button
-          className="btn btn-primary p-2"
-          onClick={handleAddToCart}
-          disabled={product.quantity <= 0}
-        >
-          <ShoppingCart size={16} />
-        </button>
+        <div className="flex space-x-1">
+          {isWeightUnit && (
+            <button
+              className="btn btn-secondary p-2"
+              onClick={() => setShowWeightSelector(!showWeightSelector)}
+              disabled={product.quantity <= 0}
+              title="Select weight"
+            >
+              <Scale size={16} />
+            </button>
+          )}
+          <button
+            className="btn btn-primary p-2"
+            onClick={() => handleAddToCart()}
+            disabled={product.quantity <= 0}
+          >
+            <ShoppingCart size={16} />
+          </button>
+        </div>
       </div>
+
+      {/* Weight Selector Dropdown */}
+      {showWeightSelector && isWeightUnit && (
+        <div className="absolute right-2 bottom-16 w-48 bg-white border border-slate-200 rounded-md shadow-lg z-10">
+          <div className="p-3">
+            <p className="text-xs font-medium text-slate-700 mb-2">Select Weight:</p>
+            <div className="grid grid-cols-2 gap-1">
+              {getCommonWeights().map((weight) => (
+                <button
+                  key={weight.value}
+                  className="px-2 py-1 text-xs bg-slate-50 hover:bg-slate-100 rounded border"
+                  onClick={() => handleWeightSelect(weight.value)}
+                  disabled={weight.value > product.quantity}
+                >
+                  {weight.label}
+                </button>
+              ))}
+            </div>
+            <button
+              className="w-full mt-2 px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 rounded border"
+              onClick={() => setShowWeightSelector(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

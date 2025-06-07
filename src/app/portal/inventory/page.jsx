@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Filter, Search, X, ArrowUpDown, Edit, Trash2, ShoppingCart } from 'lucide-react';
 import { useAppContext } from '../../../context/AppContext';
+import { getUnitById, formatQuantityWithUnit, UNITS, getUnitsByType, UNIT_TYPES } from '../../../utils/units';
 
 const Inventory = () => {
   const { products, updateProduct, deleteProduct, addToCart } = useAppContext();
@@ -111,7 +112,7 @@ const Inventory = () => {
             <ArrowUpDown size={14} className="ml-1" />
           </div>
           <div className="col-span-2 flex items-center cursor-pointer" onClick={() => handleSort('quantity')}>
-            Quantity
+            Stock
             <ArrowUpDown size={14} className="ml-1" />
           </div>
           <div className="col-span-2 text-right">Actions</div>
@@ -123,57 +124,61 @@ const Inventory = () => {
               No products found
             </div>
           ) : (
-            sortedProducts.map((product, index) => (
-              <div key={index} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-slate-50 transition-colors">
-                <div className="col-span-1 font-medium text-slate-600">
-                  {index + 1}
+            sortedProducts.map((product, index) => {
+              const unit = getUnitById(product.unit || 'pc');
+              return (
+                <div key={index} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-slate-50 transition-colors">
+                  <div className="col-span-1 font-medium text-slate-600">
+                    {index + 1}
+                  </div>
+                  <div className="col-span-3">
+                    <p className="font-medium text-slate-900">{product.name}</p>
+                    <p className="text-xs text-slate-500">Unit: {unit?.name || 'Piece'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-sm text-slate-600">{product.barcode}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="font-medium text-slate-900">₹{product.discountedPrice} per {unit?.symbol || 'pc'}</p>
+                    {product.originalPrice > product.discountedPrice && (
+                      <p className="text-sm text-slate-500 line-through">₹{product.originalPrice} per {unit?.symbol || 'pc'}</p>
+                    )}
+                  </div>
+                  <div className="col-span-2">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      product.quantity > 10
+                        ? 'bg-green-100 text-green-800'
+                        : product.quantity > 0
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                    }`}>
+                      {formatQuantityWithUnit(product.quantity, product.unit || 'pc')} in stock
+                    </span>
+                  </div>
+                  <div className="col-span-2 flex justify-end space-x-2">
+                    <button
+                      className="btn btn-ghost p-2"
+                      onClick={() => handleEdit(product)}
+                    >
+                      <Edit size={16} />
+                    </button>
+                    <button
+                      className="btn btn-ghost p-2 text-red-600 hover:bg-red-50"
+                      onClick={() => handleDelete(product.id)}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                    <button
+                      className="btn btn-ghost p-2 text-indigo-600 hover:bg-indigo-50"
+                      onClick={() => addToCart(product, 1)}
+                      disabled={product.quantity <= 0}
+                    >
+                      <ShoppingCart size={16} />
+                    </button>
+                  </div>
                 </div>
-                <div className="col-span-3">
-                  <p className="font-medium text-slate-900">{product.name}</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-sm text-slate-600">{product.barcode}</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="font-medium text-slate-900">₹{product.discountedPrice}</p>
-                  {product.originalPrice > product.discountedPrice && (
-                    <p className="text-sm text-slate-500 line-through">₹{product.originalPrice}</p>
-                  )}
-                </div>
-                <div className="col-span-2">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    product.quantity > 10
-                      ? 'bg-green-100 text-green-800'
-                      : product.quantity > 0
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-red-100 text-red-800'
-                  }`}>
-                    {product.quantity} in stock
-                  </span>
-                </div>
-                <div className="col-span-2 flex justify-end space-x-2">
-                  <button
-                    className="btn btn-ghost p-2"
-                    onClick={() => handleEdit(product)}
-                  >
-                    <Edit size={16} />
-                  </button>
-                  <button
-                    className="btn btn-ghost p-2 text-red-600 hover:bg-red-50"
-                    onClick={() => handleDelete(product.id)}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                  <button
-                    className="btn btn-ghost p-2 text-indigo-600 hover:bg-indigo-50"
-                    onClick={() => addToCart(product, 1)}
-                    disabled={product.quantity <= 0}
-                  >
-                    <ShoppingCart size={16} />
-                  </button>
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
@@ -207,6 +212,47 @@ const Inventory = () => {
                 </div>
 
                 <div>
+                  <label htmlFor="unit" className="label">Unit Type</label>
+                  <select
+                    id="unit"
+                    name="unit"
+                    className="input w-full"
+                    value={editingProduct.unit || 'pc'}
+                    onChange={handleInputChange}
+                    required
+                  >
+                    <optgroup label="Piece Units">
+                      {getUnitsByType(UNIT_TYPES.PIECE).map(unit => (
+                        <option key={unit.id} value={unit.id}>
+                          {unit.name} ({unit.symbol})
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Weight Units">
+                      {getUnitsByType(UNIT_TYPES.WEIGHT).map(unit => (
+                        <option key={unit.id} value={unit.id}>
+                          {unit.name} ({unit.symbol})
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Volume Units">
+                      {getUnitsByType(UNIT_TYPES.VOLUME).map(unit => (
+                        <option key={unit.id} value={unit.id}>
+                          {unit.name} ({unit.symbol})
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Length Units">
+                      {getUnitsByType(UNIT_TYPES.LENGTH).map(unit => (
+                        <option key={unit.id} value={unit.id}>
+                          {unit.name} ({unit.symbol})
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </div>
+
+                <div>
                   <label htmlFor="barcode" className="label">Barcode</label>
                   <input
                     type="text"
@@ -237,7 +283,7 @@ const Inventory = () => {
                   </div>
 
                   <div>
-                    <label htmlFor="discountedPrice" className="label">Discounted Price</label>
+                    <label htmlFor="discountedPrice" className="label">Selling Price</label>
                     <input
                       type="number"
                       id="discountedPrice"
@@ -253,7 +299,9 @@ const Inventory = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="quantity" className="label">Quantity</label>
+                  <label htmlFor="quantity" className="label">
+                    Quantity ({getUnitById(editingProduct.unit || 'pc')?.symbol || 'pc'})
+                  </label>
                   <input
                     type="number"
                     id="quantity"
@@ -262,6 +310,7 @@ const Inventory = () => {
                     value={editingProduct.quantity}
                     onChange={handleInputChange}
                     min="0"
+                    step={getUnitById(editingProduct.unit || 'pc')?.type === 'weight' ? '0.1' : '1'}
                     required
                   />
                 </div>

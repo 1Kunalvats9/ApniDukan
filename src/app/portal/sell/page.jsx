@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ShoppingBag, ScanLine, Plus, Phone, X, Check } from 'lucide-react';
+import { ShoppingBag, ScanLine, Plus, Phone, X, Check, Scale } from 'lucide-react';
 import { useAppContext } from '../../../context/AppContext';
+import { getUnitById, formatQuantityWithUnit, getCommonWeights } from '../../../utils/units';
 import CartItem from '../../components/ui/CartItem'; 
 
 const SellPage = () => {
@@ -14,6 +15,7 @@ const SellPage = () => {
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
   const [scanFeedback, setScanFeedback] = useState('');
   const [isPrinting, setIsPrinting] = useState(false); 
+  const [showWeightSelector, setShowWeightSelector] = useState(null);
 
   const barcodeRef = useRef(null);
   const currentInvoiceDateTimeRef = useRef(''); 
@@ -133,15 +135,18 @@ const SellPage = () => {
     const totalAmount = cartTotal.toFixed(2); 
     const savedMoney = totalSavings.toFixed(2); 
 
-    let itemsHtml = cart.map(item => `
+    let itemsHtml = cart.map(item => {
+      const unit = getUnitById(item.unit || 'pc');
+      return `
         <tr style="font-size: 0.9rem; line-height: 1.2;">
             <td style="padding: 1px 2px;">${item.name}</td>
-            <td style="padding: 1px 2px; text-align: right;">${item.cartQuantity}</td>
+            <td style="padding: 1px 2px; text-align: right;">${formatQuantityWithUnit(item.cartQuantity, item.unit || 'pc')}</td>
             <td style="padding: 1px 2px; text-align: right;">₹${Number(item.originalPrice).toFixed(2)}</td>
             <td style="padding: 1px 2px; text-align: right;">₹${Number(item.discountedPrice).toFixed(2)}</td>
             <td style="padding: 1px 2px; text-align: right;">₹${(Number(item.discountedPrice) * Number(item.cartQuantity)).toFixed(2)}</td>
         </tr>
-    `).join('');
+      `;
+    }).join('');
 
     const invoiceHtml = `
         <html>
@@ -237,7 +242,7 @@ const SellPage = () => {
                             <th style="font-size: 0.9rem; padding-right: 2px;">ITEM</th>
                             <th style="text-align: right; font-size: 0.75rem; padding-left: 2px; padding-right: 2px;">QTY</th>
                             <th style="text-align: right; font-size: 0.75rem; padding-left: 2px; padding-right: 2px;">MRP</th>
-                            <th style="text-align: right; font-size: 0.75rem; padding-left: 2px; padding-right: 2px;">Discounted</th>
+                            <th style="text-align: right; font-size: 0.75rem; padding-left: 2px; padding-right: 2px;">Rate</th>
                             <th style="text-align: right; font-size: 0.75rem; padding-left: 2px;">TOTAL</th>
                         </tr>
                     </thead>
@@ -314,19 +319,27 @@ const SellPage = () => {
     }
   };
 
-  const handleAddProduct = (product) => {
-    const existingCartItem = cart.find(item => item.barcode === product.barcode);
+  const handleAddProduct = (product, quantity = 1, unit = null) => {
+    const effectiveUnit = unit || product.unit || 'pc';
+    const existingCartItem = cart.find(item => 
+      item.barcode === product.barcode && item.unit === effectiveUnit
+    );
     const currentCartQuantity = existingCartItem ? existingCartItem.cartQuantity : 0;
     
-    if (currentCartQuantity >= product.quantity) {
-      alert(`Cannot add more ${product.name}. Insufficient stock (${product.quantity} available).`);
+    if (currentCartQuantity + quantity > product.quantity) {
+      alert(`Cannot add ${formatQuantityWithUnit(quantity, effectiveUnit)} of ${product.name}. Only ${formatQuantityWithUnit(product.quantity - currentCartQuantity, effectiveUnit)} available.`);
       return;
     }
     
-    addToCart(product, 1);
+    addToCart(product, quantity, effectiveUnit);
     setSearchQuery('');
     setSearchResults([]);
+    setShowWeightSelector(null);
     barcodeRef.current?.focus();
+  };
+
+  const handleWeightSelect = (product, weight) => {
+    handleAddProduct(product, weight, 'kg');
   };
 
   return (
@@ -400,27 +413,76 @@ const SellPage = () => {
               </div>
             ) : (
               <ul className="divide-y divide-slate-200">
-                {searchResults.map((product, index) => (
-                  <li
-                    key={`${product.barcode}-${index}`}
-                    className="p-4 hover:bg-slate-50 cursor-pointer"
-                    onClick={() => handleAddProduct(product)}
-                  >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="font-medium">{product.name}</p>
-                        <p className="text-xs text-slate-500">Barcode: {product.barcode}</p>
-                        <p className="text-xs text-slate-500">Stock: {product.quantity}</p>
+                {searchResults.map((product, index) => {
+                  const unit = getUnitById(product.unit || 'pc');
+                  const isWeightUnit = unit?.type === 'weight';
+                  
+                  return (
+                    <li
+                      key={`${product.barcode}-${index}`}
+                      className="p-4 hover:bg-slate-50 relative"
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-medium">{product.name}</p>
+                          <p className="text-xs text-slate-500">Barcode: {product.barcode}</p>
+                          <p className="text-xs text-slate-500">
+                            Stock: {formatQuantityWithUnit(product.quantity, product.unit || 'pc')}
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-semibold">₹{product.discountedPrice} per {unit?.symbol || 'pc'}</span>
+                          <div className="flex space-x-1">
+                            {isWeightUnit && (
+                              <button 
+                                className="btn btn-secondary p-1"
+                                onClick={() => setShowWeightSelector(showWeightSelector === product.id ? null : product.id)}
+                                disabled={product.quantity <= 0}
+                                title="Select weight"
+                              >
+                                <Scale size={16} />
+                              </button>
+                            )}
+                            <button 
+                              className="btn btn-ghost p-1"
+                              onClick={() => handleAddProduct(product)}
+                              disabled={product.quantity <= 0}
+                            >
+                              <Plus size={16} />
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center">
-                        <span className="font-semibold mr-3">₹{product.discountedPrice}</span>
-                        <button className="btn btn-ghost p-1">
-                          <Plus size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  </li>
-                ))}
+
+                      {/* Weight Selector Dropdown */}
+                      {showWeightSelector === product.id && isWeightUnit && (
+                        <div className="absolute right-4 top-16 w-48 bg-white border border-slate-200 rounded-md shadow-lg z-10">
+                          <div className="p-3">
+                            <p className="text-xs font-medium text-slate-700 mb-2">Select Weight:</p>
+                            <div className="grid grid-cols-2 gap-1">
+                              {getCommonWeights().map((weight) => (
+                                <button
+                                  key={weight.value}
+                                  className="px-2 py-1 text-xs bg-slate-50 hover:bg-slate-100 rounded border"
+                                  onClick={() => handleWeightSelect(product, weight.value)}
+                                  disabled={weight.value > product.quantity}
+                                >
+                                  {weight.label}
+                                </button>
+                              ))}
+                            </div>
+                            <button
+                              className="w-full mt-2 px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 rounded border"
+                              onClick={() => setShowWeightSelector(null)}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
@@ -454,8 +516,7 @@ const SellPage = () => {
             ) : (
               <div>
                 {cart.map((item, index) => (
-                  console.log(item),
-                  <CartItem key={item.id} item={item} />
+                  <CartItem key={`${item.id}-${item.unit}-${index}`} item={item} />
                 ))}
               </div>
             )}
