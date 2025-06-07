@@ -26,54 +26,89 @@ const SellPage = () => {
   }, 0);
 
   const processBarcode = useCallback((barcode) => {
+    console.log('Processing barcode:', barcode);
+    
     if (!barcode || barcode.length < 13) {
       setScanFeedback('Invalid barcode length. Please scan a valid EAN-13.');
       return;
     }
 
+    // Find the product by barcode
     const product = getProductByBarcode(barcode);
+    console.log('Product found:', product);
 
     if (product) {
-      const existingCartItem = cart.find(item => item.barcode === barcode); // Find by barcode
+      // Check if this exact product (by barcode) is already in cart
+      const existingCartItem = cart.find(item => item.barcode === barcode);
       const currentCartQuantity = existingCartItem ? existingCartItem.cartQuantity : 0;
       
+      console.log('Existing cart item:', existingCartItem);
+      console.log('Current cart quantity:', currentCartQuantity);
+      console.log('Product stock:', product.quantity);
+
+      // Check if we can add more of this product
       if (currentCartQuantity >= product.quantity) {
         setScanFeedback(`Cannot add more ${product.name}. Insufficient stock (${product.quantity} available).`);
       } else {
+        // Add the product to cart (this will either add new item or increase quantity of existing item)
         addToCart(product, 1);
-        setScanFeedback(`Added ${product.name} to cart.`);
+        setScanFeedback(`Added ${product.name} to cart. ${existingCartItem ? 'Quantity increased.' : 'New item added.'}`);
       }
     } else {
       setScanFeedback(`Product with barcode ${barcode} not found.`);
     }
-    setTimeout(() => setScanFeedback(''), 2000);
+    
+    // Clear feedback after 3 seconds
+    setTimeout(() => setScanFeedback(''), 3000);
   }, [addToCart, getProductByBarcode, cart]);
 
+  // Enhanced keyboard event handling for barcode scanning
   useEffect(() => {
     const currentBarcodeInput = barcodeRef.current;
     if (currentBarcodeInput) {
+      // Always keep focus on barcode input
       currentBarcodeInput.focus();
 
       const handleGlobalKeyDown = (e) => {
+        // If Enter is pressed and barcode input is focused
         if (e.key === 'Enter' && document.activeElement === currentBarcodeInput) {
           e.preventDefault();
-          processBarcode(currentBarcodeInput.value);
-          setBarcodeInput('');
-          setScanFeedback('');
-          currentBarcodeInput.focus();
+          const scannedBarcode = currentBarcodeInput.value.trim();
+          if (scannedBarcode) {
+            processBarcode(scannedBarcode);
+            setBarcodeInput(''); // Clear input after processing
+            currentBarcodeInput.focus(); // Keep focus
+          }
           return;
         }
 
-        // Only append key if the barcode input is focused
-        if (e.key.match(/^\d$/) && (document.activeElement === currentBarcodeInput)) {
-            setBarcodeInput((prev) => prev + e.key);
+        // Auto-focus barcode input when digits are typed (unless user is typing in other inputs)
+        if (e.key.match(/^\d$/) && 
+            document.activeElement !== currentBarcodeInput && 
+            !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+          currentBarcodeInput.focus();
+          setBarcodeInput(e.key); // Start with the typed digit
+          e.preventDefault();
         }
       };
 
+      // Handle focus events to ensure barcode input stays focused
+      const handleFocusOut = (e) => {
+        // If focus moves away from barcode input and it's not to another input field, refocus
+        setTimeout(() => {
+          if (document.activeElement && 
+              !['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement.tagName)) {
+            currentBarcodeInput.focus();
+          }
+        }, 100);
+      };
+
       document.addEventListener('keydown', handleGlobalKeyDown);
+      currentBarcodeInput.addEventListener('blur', handleFocusOut);
 
       return () => {
         document.removeEventListener('keydown', handleGlobalKeyDown);
+        currentBarcodeInput.removeEventListener('blur', handleFocusOut);
       };
     }
   }, [processBarcode]);
@@ -82,6 +117,8 @@ const SellPage = () => {
     const value = e.target.value;
     setBarcodeInput(value);
     setScanFeedback('');
+    
+    // Auto-process when 13 digits are entered (typical for EAN-13)
     if (value.length === 13) {
       processBarcode(value);
       setBarcodeInput('');
@@ -297,7 +334,7 @@ const SellPage = () => {
   };
 
   const handleAddProduct = (product) => {
-    const existingCartItem = cart.find(item => item.id === product.id);
+    const existingCartItem = cart.find(item => item.barcode === product.barcode);
     const currentCartQuantity = existingCartItem ? existingCartItem.cartQuantity : 0;
     
     if (currentCartQuantity >= product.quantity) {
@@ -325,7 +362,7 @@ const SellPage = () => {
             <div className="text-center mb-4">
               <ScanLine size={48} className="mx-auto mb-3 text-slate-400" />
               <p className="text-slate-600">Scan product barcode here.</p>
-              <p className="text-xs mt-2 text-slate-500">The input field below is always listening.</p>
+              <p className="text-xs mt-2 text-slate-500">The input field is always listening for scans.</p>
             </div>
             <input
               type="text"
@@ -339,7 +376,14 @@ const SellPage = () => {
               maxLength={13}
             />
              {scanFeedback && (
-              <p className={`mt-2 text-sm ${scanFeedback.includes('not found') || scanFeedback.includes('Cannot add') || scanFeedback.includes('Insufficient') ? 'text-red-500' : 'text-green-600'}`}>
+              <p className={`mt-2 text-sm ${
+                scanFeedback.includes('not found') || 
+                scanFeedback.includes('Cannot add') || 
+                scanFeedback.includes('Insufficient') || 
+                scanFeedback.includes('Invalid') 
+                  ? 'text-red-500' 
+                  : 'text-green-600'
+              }`}>
                 {scanFeedback}
               </p>
             )}
@@ -375,9 +419,9 @@ const SellPage = () => {
               </div>
             ) : (
               <ul className="divide-y divide-slate-200">
-                {searchResults.map((product,index) => (
+                {searchResults.map((product, index) => (
                   <li
-                    key={index}
+                    key={`${product.barcode}-${index}`}
                     className="p-4 hover:bg-slate-50 cursor-pointer"
                     onClick={() => handleAddProduct(product)}
                   >
@@ -407,7 +451,7 @@ const SellPage = () => {
           <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
             <h2 className="text-lg font-medium flex items-center">
               <ShoppingBag size={20} className="mr-2" />
-              Shopping Cart
+              Shopping Cart ({cart.length} items)
             </h2>
             {cart.length > 0 && (
               <button
@@ -428,8 +472,8 @@ const SellPage = () => {
               </div>
             ) : (
               <div>
-                {cart.map((item,index) => (
-                  <CartItem key={index} item={item} />
+                {cart.map((item, index) => (
+                  <CartItem key={`${item.barcode}-${index}`} item={item} />
                 ))}
               </div>
             )}
