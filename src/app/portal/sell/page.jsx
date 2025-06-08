@@ -28,15 +28,17 @@ const SellPage = () => {
   }, 0);
 
   const processBarcode = useCallback((barcode) => {
-    if (!barcode || barcode.length < 13) {
-      setScanFeedback('Invalid barcode length. Please scan a valid EAN-13.');
+    if (!barcode || barcode.trim().length === 0) {
+      setScanFeedback('Invalid barcode. Please scan a valid barcode.');
       return;
     }
 
-    const product = getProductByBarcode(barcode);
+    // Remove length validation - accept any barcode length
+    const trimmedBarcode = barcode.trim();
+    const product = getProductByBarcode(trimmedBarcode);
 
     if (product) {
-      const existingCartItem = cart.find(item => item.barcode === barcode);
+      const existingCartItem = cart.find(item => item.barcode === trimmedBarcode);
       const currentCartQuantity = existingCartItem ? existingCartItem.cartQuantity : 0;
       
       if (currentCartQuantity >= product.quantity) {
@@ -46,7 +48,7 @@ const SellPage = () => {
         setScanFeedback(`Added ${product.name} to cart. ${existingCartItem ? 'Quantity increased.' : 'New item added.'}`);
       }
     } else {
-      setScanFeedback(`Product with barcode ${barcode} not found.`);
+      setScanFeedback(`Product with barcode ${trimmedBarcode} not found.`);
     }
     
     setTimeout(() => setScanFeedback(''), 3000);
@@ -102,11 +104,8 @@ const SellPage = () => {
     setBarcodeInput(value);
     setScanFeedback('');
     
-    if (value.length === 13) {
-      processBarcode(value);
-      setBarcodeInput('');
-      barcodeRef.current?.focus();
-    }
+    // Remove automatic processing based on length
+    // Let users manually trigger processing or use Enter key
   };
 
   useEffect(() => {
@@ -356,7 +355,7 @@ const SellPage = () => {
             <div className="text-center mb-4">
               <ScanLine size={48} className="mx-auto mb-3 text-slate-400" />
               <p className="text-slate-600">Scan product barcode here.</p>
-              <p className="text-xs mt-2 text-slate-500">The input field is always listening for scans.</p>
+              <p className="text-xs mt-2 text-slate-500">The input field is always listening for scans. Accepts any barcode length.</p>
             </div>
             <input
               type="text"
@@ -365,10 +364,21 @@ const SellPage = () => {
               value={barcodeInput}
               onChange={handleBarcodeInputChange}
               className="input w-full text-center text-lg font-bold tracking-widest"
-              placeholder="Scan Barcode Here..."
+              placeholder="Scan or type barcode here..."
               autoFocus
-              maxLength={13}
             />
+            {barcodeInput && (
+              <button
+                type="button"
+                className="btn btn-primary w-full mt-2"
+                onClick={() => {
+                  processBarcode(barcodeInput);
+                  setBarcodeInput('');
+                }}
+              >
+                Add to Cart
+              </button>
+            )}
              {scanFeedback && (
               <p className={`mt-2 text-sm ${
                 scanFeedback.includes('not found') || 

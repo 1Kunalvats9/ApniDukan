@@ -27,27 +27,25 @@ const AddProductPage = () => {
   const barcodeRef = useRef(null);
 
   const processScannedBarcode = useCallback((barcode) => {
-    if (!barcode || barcode.length < 13) {
-      setScanFeedback('Invalid barcode length. Please scan a valid EAN-13.');
+    if (!barcode || barcode.trim().length === 0) {
+      setScanFeedback('Invalid barcode. Please scan a valid barcode.');
       return;
     }
 
-    if (!isValidEAN13(barcode)) {
-      setScanFeedback('Invalid EAN-13 barcode format.');
-      return;
-    }
+    // Remove the length validation - accept any barcode length
+    const trimmedBarcode = barcode.trim();
 
     // Check if product with this barcode already exists
-    const existingProduct = getProductByBarcode(barcode);
+    const existingProduct = getProductByBarcode(trimmedBarcode);
     if (existingProduct) {
       setScanFeedback(`Product "${existingProduct.name}" already exists with this barcode.`);
       return;
     }
 
     // Set the scanned barcode to form
-    setFormData(prev => ({ ...prev, barcode }));
+    setFormData(prev => ({ ...prev, barcode: trimmedBarcode }));
     setUseScannedBarcode(true);
-    setScanFeedback(`Barcode ${barcode} scanned successfully!`);
+    setScanFeedback(`Barcode ${trimmedBarcode} scanned successfully!`);
     setTimeout(() => setScanFeedback(''), 3000);
   }, [getProductByBarcode]);
 
@@ -76,10 +74,9 @@ const AddProductPage = () => {
     const value = e.target.value;
     setBarcodeInput(value);
     setScanFeedback('');
-    if (value.length === 13) {
-      processScannedBarcode(value);
-      setBarcodeInput('');
-    }
+    
+    // Remove automatic processing on length - let user decide when to process
+    // Users can press Enter or manually trigger processing
   };
 
   const handleInputChange = (e) => {
@@ -113,10 +110,7 @@ const AddProductPage = () => {
         throw new Error('Barcode is required');
       }
 
-      if (!isValidEAN13(formData.barcode)) {
-        throw new Error('Invalid barcode format');
-      }
-
+      // Remove EAN13 validation - accept any barcode format
       const originalPrice = parseFloat(formData.originalPrice);
       const discountedPrice = parseFloat(formData.discountedPrice);
       const quantity = parseFloat(formData.quantity);
@@ -229,6 +223,7 @@ const AddProductPage = () => {
                 <div className="text-center">
                   <ScanLine size={48} className="mx-auto mb-3 text-slate-400" />
                   <p className="text-slate-600">Scan product barcode here</p>
+                  <p className="text-xs text-slate-500 mt-1">Press Enter after scanning or typing barcode</p>
                 </div>
                 <input
                   type="text"
@@ -236,9 +231,20 @@ const AddProductPage = () => {
                   value={barcodeInput}
                   onChange={handleBarcodeInputChange}
                   className="input w-full text-center text-lg font-bold tracking-widest"
-                  placeholder="Scan Barcode Here..."
-                  maxLength={13}
+                  placeholder="Scan or type barcode here..."
                 />
+                {barcodeInput && (
+                  <button
+                    type="button"
+                    className="btn btn-primary w-full"
+                    onClick={() => {
+                      processScannedBarcode(barcodeInput);
+                      setBarcodeInput('');
+                    }}
+                  >
+                    Use This Barcode
+                  </button>
+                )}
               </div>
             )}
 
@@ -273,7 +279,19 @@ const AddProductPage = () => {
 
             {showBarcodePreview && formData.barcode && (
               <div className="border border-slate-200 rounded-lg p-4 bg-white">
-                <BarcodeDisplay value={formData.barcode} />
+                {formData.barcode.length === 13 && isValidEAN13(formData.barcode) ? (
+                  <BarcodeDisplay value={formData.barcode} />
+                ) : (
+                  <div className="text-center p-4">
+                    <p className="text-slate-600 mb-2">Barcode: {formData.barcode}</p>
+                    <p className="text-xs text-slate-500">
+                      {formData.barcode.length !== 13 
+                        ? 'Non-standard barcode length - will be stored as text'
+                        : 'Invalid EAN13 format - will be stored as text'
+                      }
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
