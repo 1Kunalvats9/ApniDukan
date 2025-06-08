@@ -262,7 +262,6 @@ const Inventory = () => {
                     value={editingProduct.barcode}
                     onChange={handleInputChange}
                     required
-                    readOnly
                   />
                 </div>
 

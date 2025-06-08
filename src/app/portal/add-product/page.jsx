@@ -8,7 +8,7 @@ import { UNITS, getUnitsByType, UNIT_TYPES } from '../../../utils/units';
 import BarcodeDisplay from '../../components/ui/BarcodeDisplay';
 
 const AddProductPage = () => {
-  const { addProduct, getProductByBarcode } = useAppContext();
+  const { addProduct, getProductByBarcode, updateProduct } = useAppContext();
   const [formData, setFormData] = useState({
     name: '',
     originalPrice: '',
@@ -38,7 +38,19 @@ const AddProductPage = () => {
     // Check if product with this barcode already exists
     const existingProduct = getProductByBarcode(trimmedBarcode);
     if (existingProduct) {
-      setScanFeedback(`Product "${existingProduct.name}" already exists with this barcode.`);
+      // Auto-fill the form with existing product details instead of showing an error
+      setFormData({
+        name: existingProduct.name,
+        originalPrice: existingProduct.originalPrice,
+        discountedPrice: existingProduct.discountedPrice,
+        quantity: existingProduct.quantity,
+        barcode: existingProduct.barcode,
+        unit: existingProduct.unit || 'pc'
+      });
+      setUseScannedBarcode(true);
+      setShowBarcodePreview(true);
+      setScanFeedback(`Product "${existingProduct.name}" found. Form auto-filled. Updating quantities will update the product.`);
+      setTimeout(() => setScanFeedback(''), 5000);
       return;
     }
 
@@ -74,7 +86,7 @@ const AddProductPage = () => {
     const value = e.target.value;
     setBarcodeInput(value);
     setScanFeedback('');
-    
+
     // Remove automatic processing on length - let user decide when to process
     // Users can press Enter or manually trigger processing
   };
@@ -131,12 +143,6 @@ const AddProductPage = () => {
         throw new Error('Quantity cannot be negative');
       }
 
-      // Check if product with this barcode already exists
-      const existingProduct = getProductByBarcode(formData.barcode);
-      if (existingProduct) {
-        throw new Error(`Product "${existingProduct.name}" already exists with this barcode`);
-      }
-
       const productData = {
         name: formData.name.trim(),
         originalPrice,
@@ -146,8 +152,20 @@ const AddProductPage = () => {
         unit: formData.unit
       };
 
-      await addProduct(productData);
-      setSuccess(true);
+      // Check if product with this barcode already exists
+      const existingProduct = getProductByBarcode(formData.barcode);
+      if (existingProduct) {
+        // Update the existing product instead of showing an error
+        productData.id = existingProduct.id; // Preserve the product ID
+        await updateProduct(productData);
+        setSuccess(true);
+        setScanFeedback(`Product "${existingProduct.name}" has been updated successfully.`);
+      } else {
+        // Add new product
+        await addProduct(productData);
+        setSuccess(true);
+        setScanFeedback(`Product "${productData.name}" has been added successfully.`);
+      }
 
       // Reset form
       setFormData({
@@ -164,6 +182,7 @@ const AddProductPage = () => {
 
       setTimeout(() => {
         setSuccess(false);
+        setScanFeedback('');
       }, 3000);
 
     } catch (error) {

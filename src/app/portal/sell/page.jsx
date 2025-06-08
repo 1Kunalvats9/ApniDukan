@@ -21,7 +21,7 @@ const SellPage = () => {
   const currentInvoiceDateTimeRef = useRef(''); 
 
   const cartTotal = cart.reduce((total, item) => total + (item.discountedPrice * item.cartQuantity), 0);
-  
+
   const totalSavings = cart.reduce((total, item) => {
     const itemSavings = (item.originalPrice - item.discountedPrice) * item.cartQuantity;
     return total + itemSavings;
@@ -39,7 +39,7 @@ const SellPage = () => {
     if (product) {
       const existingCartItem = cart.find(item => item.barcode === trimmedBarcode);
       const currentCartQuantity = existingCartItem ? existingCartItem.cartQuantity : 0;
-      
+
       if (currentCartQuantity >= product.quantity) {
         setScanFeedback(`Cannot add more ${product.name}. Insufficient stock (${product.quantity} available).`);
       } else {
@@ -49,7 +49,7 @@ const SellPage = () => {
     } else {
       setScanFeedback(`Product with barcode ${trimmedBarcode} not found.`);
     }
-    
+
     // Clear the barcode input after processing
     setBarcodeInput(''); 
     // Refocus the input field after processing
@@ -124,7 +124,7 @@ const SellPage = () => {
       setSearchResults([]);
     }
   }, [searchQuery, products]);
-  
+
   const handlePrintBill = useCallback(() => {
     if (cart.length === 0) {
       console.error("Cart is empty. Nothing to print!");
@@ -183,7 +183,7 @@ const SellPage = () => {
                 .pb-2 { padding-bottom: 0.4rem; }
                 .pt-2 { padding-top: 0.4rem; }
                 .font-bold { font-weight: bold; }
-                
+
                 .text-xxl { font-size: 1.8rem; } 
                 .text-xl { font-size: 1.4rem; } 
                 .text-lg { font-size: 1.1rem; } 
@@ -312,7 +312,7 @@ const SellPage = () => {
       setCustomerPhone('');
       setBarcodeInput(''); // Clear barcode input on successful checkout
       barcodeRef.current?.focus(); // Refocus barcode input
-      
+
       setTimeout(() => {
         handlePrintBill();
         setCheckoutSuccess(false);
@@ -329,12 +329,12 @@ const SellPage = () => {
       item.barcode === product.barcode && item.unit === effectiveUnit
     );
     const currentCartQuantity = existingCartItem ? existingCartItem.cartQuantity : 0;
-    
+
     if (currentCartQuantity + quantity > product.quantity) {
       alert(`Cannot add ${formatQuantityWithUnit(quantity, effectiveUnit)} of ${product.name}. Only ${formatQuantityWithUnit(product.quantity - currentCartQuantity, effectiveUnit)} available.`);
       return;
     }
-    
+
     addToCart(product, quantity, effectiveUnit);
     setSearchQuery('');
     setSearchResults([]);
@@ -432,7 +432,7 @@ const SellPage = () => {
                 {searchResults.map((product, index) => {
                   const unit = getUnitById(product.unit || 'pc');
                   const isWeightUnit = unit?.type === 'weight';
-                  
+
                   return (
                     <li
                       key={`${product.barcode}-${index}`}
@@ -506,7 +506,7 @@ const SellPage = () => {
       </div>
 
       <div className="lg:w-1/2 flex flex-col">
-        <div className="card flex-1 overflow-hidden">
+        <div className="card flex-1 overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 100px)' }}>
           <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
             <h2 className="text-lg font-medium flex items-center">
               <ShoppingBag size={20} className="mr-2" />
@@ -522,7 +522,7 @@ const SellPage = () => {
             )}
           </div>
 
-          <div className="overflow-y-auto flex-1" style={{ maxHeight: 'calc(100vh - 380px)' }}>
+          <div className="overflow-y-auto flex-grow">
             {cart.length === 0 ? (
               <div className="p-8 text-center text-slate-500">
                 <ShoppingBag size={48} className="mx-auto mb-4 text-slate-300" />
@@ -538,7 +538,7 @@ const SellPage = () => {
             )}
           </div>
 
-          <div className="p-4 border-t border-slate-200 bg-white">
+          <div className="p-4 border-t border-slate-200 bg-white mt-auto">
             <div className="flex justify-between items-center mb-4">
               <span className="text-lg font-medium">Total</span>
               <span className="text-xl font-bold">₹{cartTotal.toFixed(2)}</span>
