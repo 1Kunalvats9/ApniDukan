@@ -33,7 +33,6 @@ const SellPage = () => {
       return;
     }
 
-    // Remove length validation - accept any barcode length
     const trimmedBarcode = barcode.trim();
     const product = getProductByBarcode(trimmedBarcode);
 
@@ -51,8 +50,26 @@ const SellPage = () => {
       setScanFeedback(`Product with barcode ${trimmedBarcode} not found.`);
     }
     
+    // Clear the barcode input after processing
+    setBarcodeInput(''); 
+    // Refocus the input field after processing
+    barcodeRef.current?.focus();
     setTimeout(() => setScanFeedback(''), 3000);
   }, [addToCart, getProductByBarcode, cart]);
+
+  // Debounce effect for barcode input
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (barcodeInput.trim().length > 0 && barcodeRef.current === document.activeElement) {
+        processBarcode(barcodeInput);
+      }
+    }, 300); // Debounce delay of 300ms
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [barcodeInput, processBarcode]);
+
 
   useEffect(() => {
     const currentBarcodeInput = barcodeRef.current;
@@ -60,17 +77,8 @@ const SellPage = () => {
       currentBarcodeInput.focus();
 
       const handleGlobalKeyDown = (e) => {
-        if (e.key === 'Enter' && document.activeElement === currentBarcodeInput) {
-          e.preventDefault();
-          const scannedBarcode = currentBarcodeInput.value.trim();
-          if (scannedBarcode) {
-            processBarcode(scannedBarcode);
-            setBarcodeInput('');
-            currentBarcodeInput.focus();
-          }
-          return;
-        }
-
+        // Only allow direct typing into barcode input if it's not focused and key is a digit.
+        // The automatic processing is now handled by the debounce effect.
         if (e.key.match(/^\d$/) && 
             document.activeElement !== currentBarcodeInput && 
             !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
@@ -103,9 +111,6 @@ const SellPage = () => {
     const value = e.target.value;
     setBarcodeInput(value);
     setScanFeedback('');
-    
-    // Remove automatic processing based on length
-    // Let users manually trigger processing or use Enter key
   };
 
   useEffect(() => {
@@ -305,9 +310,9 @@ const SellPage = () => {
       await checkout(customerPhone); 
       setCheckoutSuccess(true);
       setCustomerPhone('');
-      setBarcodeInput('');
-      barcodeRef.current?.focus();
-
+      setBarcodeInput(''); // Clear barcode input on successful checkout
+      barcodeRef.current?.focus(); // Refocus barcode input
+      
       setTimeout(() => {
         handlePrintBill();
         setCheckoutSuccess(false);
@@ -367,18 +372,19 @@ const SellPage = () => {
               placeholder="Scan or type barcode here..."
               autoFocus
             />
-            {barcodeInput && (
+            {/* The "Add to Cart" button can be removed if you rely solely on automatic processing, 
+                or kept as a manual trigger if needed. For immediate processing, it's less critical. */}
+            {/* {barcodeInput && (
               <button
                 type="button"
                 className="btn btn-primary w-full mt-2"
                 onClick={() => {
                   processBarcode(barcodeInput);
-                  setBarcodeInput('');
                 }}
               >
                 Add to Cart
               </button>
-            )}
+            )} */}
              {scanFeedback && (
               <p className={`mt-2 text-sm ${
                 scanFeedback.includes('not found') || 
