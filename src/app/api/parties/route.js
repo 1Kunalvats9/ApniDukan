@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import connectDb from '../../../lib/connectDb';
-import { Party } from '../../../models/Party';
+import Party from '../../../models/Party';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'kst_apnidukaan';
@@ -10,7 +10,7 @@ const getUserFromToken = (request) => {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null;
   }
-  
+
   try {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET);
@@ -23,13 +23,15 @@ const getUserFromToken = (request) => {
 export async function GET(request) {
   try {
     await connectDb();
-    
+
     const user = getUserFromToken(request);
     if (!user) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
+    // Corrected logic to fetch parties for the user
     const parties = await Party.find({ userId: user.id }).sort({ createdAt: -1 });
+
     return NextResponse.json(parties, { status: 200 });
   } catch (error) {
     console.error('Error fetching parties:', error);
@@ -40,7 +42,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     await connectDb();
-    
+
     const user = getUserFromToken(request);
     if (!user) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });

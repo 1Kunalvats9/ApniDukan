@@ -13,6 +13,8 @@
 # testing
 /coverage
 
+/gcp-credentials.json
+
 # next.js
 /.next/
 /out/
