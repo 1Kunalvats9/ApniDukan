@@ -123,6 +123,17 @@ const AddProductPage = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    
+    if (name === 'quantity') {
+      // For quantity, ensure integer values for piece units
+      const unit = getUnitById(formData.unit || 'pc');
+      if (unit?.type === 'piece') {
+        const intValue = parseInt(value) || 0;
+        setFormData(prev => ({ ...prev, [name]: intValue }));
+        return;
+      }
+    }
+    
     setFormData(prev => ({
       ...prev,
       [name]: name === 'originalPrice' || name === 'discountedPrice' || name === 'quantity'
@@ -716,7 +727,7 @@ const AddProductPage = () => {
                     onChange={(e) => setQuantityToAdd(e.target.value)}
                     placeholder="Enter quantity to add"
                     min="0.01"
-                    step={existingHsnProduct.unit === 'kg' ? '0.1' : '1'}
+                    step="1"
                     required
                   />
                 </div>
@@ -848,7 +859,7 @@ const AddProductPage = () => {
                     onChange={handleInputChange}
                     placeholder="0"
                     min="0"
-                    step={selectedUnit?.type === 'weight' ? '0.1' : '1'}
+                    step="1"
                     required
                   />
                 </div>

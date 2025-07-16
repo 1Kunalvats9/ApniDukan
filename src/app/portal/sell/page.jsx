@@ -81,7 +81,8 @@ const SellPage = () => {
         // The automatic processing is now handled by the debounce effect.
         if (e.key.match(/^\d$/) && 
             document.activeElement !== currentBarcodeInput && 
-            !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+            !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName) &&
+            !document.activeElement.closest('.cart-quantity-input')) {
           currentBarcodeInput.focus();
           setBarcodeInput(e.key);
           e.preventDefault();
@@ -91,7 +92,8 @@ const SellPage = () => {
       const handleFocusOut = (e) => {
         setTimeout(() => {
           if (document.activeElement && 
-              !['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement.tagName)) {
+              !['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement.tagName) &&
+              !document.activeElement.closest('.cart-quantity-input')) {
             currentBarcodeInput.focus();
           }
         }, 100);

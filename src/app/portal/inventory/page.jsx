@@ -56,12 +56,24 @@ const Inventory = () => {
 
   const handleInputChange = (e) => { 
     const { name, value } = e.target;
+    
+    let processedValue = value;
+    if (name === 'quantity') {
+      // For quantity, ensure integer values for piece units
+      const unit = getUnitById(editingProduct.unit || 'pc');
+      if (unit?.type === 'piece') {
+        processedValue = parseInt(value) || 0;
+      } else {
+        processedValue = parseFloat(value) || 0;
+      }
+    } else if (name === 'originalPrice' || name === 'discountedPrice') {
+      processedValue = parseFloat(value) || 0;
+    }
+    
     if (editingProduct) {
       setEditingProduct({
         ...editingProduct,
-        [name]: name === 'originalPrice' || name === 'discountedPrice' || name === 'quantity'
-          ? parseFloat(value) || 0
-          : value,
+        [name]: processedValue,
       });
     }
   };
@@ -325,7 +337,7 @@ const Inventory = () => {
                     value={editingProduct.quantity}
                     onChange={handleInputChange}
                     min="0"
-                    step={getUnitById(editingProduct.unit || 'pc')?.type === 'weight' ? '0.1' : '1'}
+                    step="1"
                     required
                   />
                 </div>

@@ -22,7 +22,9 @@ const CartItem = ({ item }) => {
     } else if (newQuantity > maxStockQuantity) {
       alert(`Cannot add more ${item.name}. Only ${maxStockQuantity} available.`);
     } else {
-      updateCartItem(item.id, newQuantity, item.unit);
+      // Ensure integer values for piece units
+      const finalQuantity = unit?.type === 'piece' ? Math.round(newQuantity) : newQuantity;
+      updateCartItem(item.id, finalQuantity, item.unit);
     }
   }, [item, maxStockQuantity, updateCartItem, removeFromCart]);
 
@@ -41,15 +43,17 @@ const CartItem = ({ item }) => {
       alert(`Cannot add more than ${maxStockQuantity} ${unit?.symbol || ''} of ${item.name}.`);
       return;
     }
-    updateCartItem(item.id, value, item.unit);
+    // Ensure integer values for piece units
+    const finalValue = unit?.type === 'piece' ? Math.round(value) : value;
+    updateCartItem(item.id, finalValue, item.unit);
   }, [item, maxStockQuantity, updateCartItem, unit]);
 
   const handleRemoveClick = useCallback(() => {
     removeFromCart(item.id);
   }, [item, removeFromCart]);
 
-  const incrementStep = isWeightUnit ? 0.1 : 1;
-  const decrementStep = isWeightUnit ? 0.1 : 1;
+  const incrementStep = 1;
+  const decrementStep = 1;
 
   return (
     <div className="flex items-center p-3 border-b border-slate-200 animate-slide-in">
@@ -81,10 +85,18 @@ const CartItem = ({ item }) => {
                 max={maxStockQuantity}
                 value={item.cartQuantity}
                 onChange={handleCustomQuantityChange}
-                className="w-16 px-1 py-1 text-center text-sm border-0 focus:outline-none"
+                className="w-16 px-1 py-1 text-center text-sm border-0 focus:outline-none cart-quantity-input"
               />
             ) : (
-              <span className="px-2 text-center min-w-8">{item.cartQuantity}</span>
+              <input
+                type="number"
+                step="1"
+                min="1"
+                max={maxStockQuantity}
+                value={item.cartQuantity}
+                onChange={handleCustomQuantityChange}
+                className="w-16 px-1 py-1 text-center text-sm border-0 focus:outline-none cart-quantity-input"
+              />
             )}
             
             <button
