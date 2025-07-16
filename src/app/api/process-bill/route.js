@@ -1,39 +1,36 @@
 import { NextResponse } from 'next/server';
 import { ImageAnnotatorClient } from '@google-cloud/vision';
+import { GoogleGenerativeAI } from '@google/generative-ai'; // <-- NEW: Import Google AI
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import fs from 'fs';
 
 // --- Authentication ---
 const JWT_SECRET = process.env.JWT_SECRET || 'kst_apnidukaan';
-
 const getUserFromToken = (request) => {
     const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
     try {
         const token = authHeader.split(' ')[1];
         return jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-        return null;
-    }
+    } catch (error) { return null; }
 };
 
-// --- Google Vision Client Initialization ---
+// --- Google Vision Client (for OCR) ---
 let visionClient;
+// (Vision client initialization logic remains the same)
 try {
     const credentialsJson = process.env.GCP_CREDENTIALS_JSON;
     if (credentialsJson) {
         const credentials = JSON.parse(credentialsJson);
         visionClient = new ImageAnnotatorClient({ credentials, projectId: credentials.project_id });
-        console.log("Google Cloud Vision client initialized from environment variable.");
     } else {
         const credentialsPath = path.join(process.cwd(), 'gcp-credentials.json');
         if (fs.existsSync(credentialsPath)) {
             const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
             visionClient = new ImageAnnotatorClient({ credentials, projectId: credentials.project_id });
-            console.log("Google Cloud Vision client initialized from local gcp-credentials.json file.");
         } else {
-            throw new Error("GCP credentials not found.");
+            throw new Error("GCP credentials not found for Vision API.");
         }
     }
 } catch (error) {
@@ -41,13 +38,21 @@ try {
     visionClient = null;
 }
 
+// --- NEW: Google Gemini Client (for data extraction) ---
+let genAI;
+if (process.env.GEMINI_API_KEY) {
+    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+} else {
+    console.error("GEMINI_API_KEY not found in environment variables.");
+    genAI = null;
+}
+
 // --- Main API Function ---
 export async function POST(request) {
-    if (!visionClient) {
-        return NextResponse.json({ message: 'Server configuration error: Vision API not initialized.' }, { status: 500 });
+    if (!visionClient || !genAI) {
+        return NextResponse.json({ message: 'Server configuration error: AI services not initialized.' }, { status: 500 });
     }
-    const user = getUserFromToken(request);
-    if (!user) {
+    if (!getUserFromToken(request)) {
         return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
@@ -64,65 +69,39 @@ export async function POST(request) {
             return NextResponse.json({ message: 'No text could be extracted from the image.' }, { status: 400 });
         }
 
-        // Using a system prompt for stronger instructions
-        const systemPrompt = `You are an automated data entry assistant. Your only function is to analyze raw text from a bill and return a single, valid JSON object. Do not provide any conversational text, introductions, or explanations. The JSON object must contain a single key, "items", which is an array of products. If no items are found, return an empty array.
-
-        For each item, extract:
-        - "name": Full product name, corrected for OCR errors.
-        - "hsnSacCode": HSN/SAC code as a string, or an empty string "" if not found.
-        - "quantity": The numerical quantity.
-        - "costPrice": The price per single unit, as a number.
-        - "gstRate": The GST percentage, as a number, or 0 if not found.`;
-
-        const userPrompt = `Please process the following raw OCR text:\n---\n${rawText}\n---`;
-
-        const llmResponse = await fetch('https://api.together.xyz/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.TOGETHER_AI_API_KEY}`,
-            },
-            body: JSON.stringify({
-                // Using a top-tier, reliable model for instruction following.
-                model: 'mistralai/Mixtral-8x7B-Instruct-v0.1',
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ],
-                // We still use response_format as a strong hint to the model
-                response_format: { type: 'json_object' },
-                temperature: 0.0, // Set to 0 for maximum predictability
-            }),
+        // --- REVISED: Prompt and Model for Gemini ---
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash-latest",
+            generationConfig: { responseMimeType: "application/json" } // Use built-in JSON mode
         });
 
-        if (!llmResponse.ok) {
-            const errorBody = await llmResponse.text();
-            console.error('LLM API Error:', errorBody);
-            throw new Error('The AI model service returned an error.');
-        }
+        const prompt = `You are an automated data entry assistant. Your only function is to analyze raw text from a bill and return a single, valid JSON object. Do not provide any conversational text, introductions, or explanations. The JSON object must contain a single key, "items", which is an array of products. If no items are found, return an empty array.
 
-        const llmData = await llmResponse.json();
-        let responseContent = llmData.choices[0].message.content;
+        For each item in the array, extract:
+        - "name": (string) The full product name, corrected for OCR errors.
+        - "hsnSacCode": (string) The HSN or SAC code. If not found, return an empty string "".
+        - "quantity": (number) The numerical quantity.
+        - "costPrice": (number) The price per single unit (rate/price).
+        - "gstRate": (number) The GST percentage. If not found, return 0.
+        
+        Here is the raw OCR text:
+        ---
+        ${rawText}
+        ---`;
 
-        // ** ROBUST JSON EXTRACTION LOGIC **
-        // This finds the JSON block even if the AI adds extra text.
-        const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
+        const result = await model.generateContent(prompt);
+        const response = result.response;
+        const jsonText = response.text();
 
-        if (!jsonMatch) {
-            console.error("Raw LLM response did not contain a JSON object:", responseContent);
-            throw new Error('AI model did not return a valid JSON object.');
-        }
+        const extractedJson = JSON.parse(jsonText);
 
-        const extractedJsonString = jsonMatch[0];
-        const extractedJson = JSON.parse(extractedJsonString);
-
-        // Return the clean, structured data
+        // Return the clean, structured data from Gemini
         return NextResponse.json(extractedJson, { status: 200 });
 
     } catch (error) {
-        console.error('Error in /api/process-bill:', error.message);
+        console.error('Error in /api/process-bill:', error);
         if (error instanceof SyntaxError) {
-            return NextResponse.json({ message: 'AI model returned invalid JSON format after cleaning.' }, { status: 500 });
+            return NextResponse.json({ message: 'AI model returned invalid JSON format.' }, { status: 500 });
         }
         return NextResponse.json({ message: error.message || 'An internal server error occurred.' }, { status: 500 });
     }

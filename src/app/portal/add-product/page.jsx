@@ -255,7 +255,7 @@ const AddProductPage = () => {
                     <form onSubmit={handleHsnQuantitySubmit} className="p-6 space-y-4">
                       <div className="bg-slate-50 p-4 rounded-lg">Adding to: <strong>{existingHsnProduct.name}</strong></div>
                       <label className="label">Quantity to Add ({existingHsnProduct.unit})*</label>
-                      <input type="number" className="input w-full" value={quantityToAdd} onChange={(e) => setQuantityToAdd(e.target.value)} min="0.01" step="1" required />
+                      <input type="number" className="input w-full" value={quantityToAdd} onChange={(e) => setQuantityToAdd(e.target.value)} min="0.01" step="any" required />
                       <button type="submit" className="btn btn-primary w-full" disabled={loading}>{loading ? 'Adding...' : <><Plus size={16} className="mr-2"/>Add to Stock</>}</button>
                     </form>
                   </div>
