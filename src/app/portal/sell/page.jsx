@@ -143,9 +143,10 @@ const SellPage = () => {
 
     let itemsHtml = cart.map(item => {
       const unit = getUnitById(item.unit || 'pc');
+      const hsnDisplay = item.hsnSacCode ? ` (HSN: ${item.hsnSacCode})` : '';
       return `
         <tr style="font-size: 0.9rem; line-height: 1.2;">
-            <td style="padding: 1px 2px;">${item.name}</td>
+            <td style="padding: 1px 2px;">${item.name}${hsnDisplay}</td>
             <td style="padding: 1px 2px; text-align: right;">${formatQuantityWithUnit(item.cartQuantity, item.unit || 'pc')}</td>
             <td style="padding: 1px 2px; text-align: right;">₹${Number(item.originalPrice).toFixed(2)}</td>
             <td style="padding: 1px 2px; text-align: right;">₹${Number(item.discountedPrice).toFixed(2)}</td>
@@ -232,6 +233,8 @@ const SellPage = () => {
             <div class="container">
                 <div class="text-center mb-6">
                     <h1 class="text-xxl font-bold">BALAJI BACHAT BAZAR</h1>
+                    <p class="text-sm">GST No: 08DOXPD1589D1ZJ</p>
+                    <p class="text-sm">UDYAM: UDYAM-RJ-37-0003460</p>
                     <p class="text-md">Contact: 9982171806</p>
                     <p class="text-lg font-bold mt-2">SALES INVOICE</p>
                 </div>
