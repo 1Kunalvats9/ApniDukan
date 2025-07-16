@@ -134,6 +134,9 @@ const Inventory = () => {
                   <div className="col-span-3">
                     <p className="font-medium text-slate-900">{product.name}</p>
                     <p className="text-xs text-slate-500">Unit: {unit?.name || 'Piece'}</p>
+                    {product.hsnSacCode && (
+                      <p className="text-xs text-slate-500">HSN/SAC: {product.hsnSacCode}</p>
+                    )}
                   </div>
                   <div className="col-span-2">
                     <p className="text-sm text-slate-600">{product.barcode}</p>
@@ -208,6 +211,19 @@ const Inventory = () => {
                     value={editingProduct.name}
                     onChange={handleInputChange}
                     required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="hsnSacCode" className="label">HSN/SAC Code</label>
+                  <input
+                    type="text"
+                    id="hsnSacCode"
+                    name="hsnSacCode"
+                    className="input w-full"
+                    value={editingProduct.hsnSacCode || ''}
+                    onChange={handleInputChange}
+                    placeholder="Enter HSN/SAC code (optional)"
                   />
                 </div>
 

@@ -126,6 +126,10 @@ export const AppProvider = ({ children }) => {
   const getProductByBarcode = useCallback((barcode) => {
     return products.find(p => p.barcode === barcode);
   }, [products]);
+
+  const getProductByHsnSacCode = useCallback((hsnSacCode) => {
+    return products.find(p => p.hsnSacCode === hsnSacCode);
+  }, [products]);
   
   const searchProducts = useCallback((query) => {
     if (!query) return products;
@@ -262,6 +266,7 @@ export const AppProvider = ({ children }) => {
     updateProduct,
     deleteProduct,
     getProductByBarcode,
+    getProductByHsnSacCode,
     searchProducts,
     addToCart,
     updateCartItem,
