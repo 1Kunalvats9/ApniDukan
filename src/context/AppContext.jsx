@@ -21,6 +21,7 @@ export const AppProvider = ({ children }) => {
   const [liabilities, setLiabilities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(Date.now());
+  const [isEditingQuantity, setIsEditingQuantity] = useState(false);
 
   const normalizeProducts = useCallback(async (productsData) => {
     // This function remains the same
@@ -52,6 +53,23 @@ export const AppProvider = ({ children }) => {
       setLastUpdate(Date.now());
     } catch (error) { console.error('Error refreshing data:', error); }
   }, [normalizeProducts]);
+
+  // Add function to ensure product IDs exist
+  const ensureProductIds = useCallback(async (productsData) => {
+    let changed = false;
+    const updatedProducts = productsData.map(p => {
+      if (!p.id) {
+        changed = true;
+        return { ...p, id: uuidv4() };
+      }
+      return p;
+    });
+    if (changed) {
+      await saveProducts(updatedProducts);
+      await refreshData();
+    }
+    return updatedProducts;
+  }, [refreshData]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -348,9 +366,10 @@ export const AppProvider = ({ children }) => {
   const value = {
     products, cart, customers, sales, expenses, liabilities, analytics, accounting,
     lastUpdate, loading,
+    isEditingQuantity, setIsEditingQuantity,
     addProduct, updateProduct, deleteProduct, getProductByBarcode, getProductByHsnSacCode,
     searchProducts, addToCart, updateCartItem, removeFromCart, clearCart, checkout,
-    refreshData, addExpense, addLiability,
+    refreshData, addExpense, addLiability, ensureProductIds,
     processPurchaseBillItems,
     addDiscoveredProducts,
   };
