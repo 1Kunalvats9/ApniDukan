@@ -7,7 +7,7 @@ import { LayoutDashboard, Package, PlusCircle, Users, ShoppingCart, Printer, Bar
 import { useAuth } from '../../../context/AuthContext';
 
 const Sidebar= () => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const pathname = usePathname(); 
   const {logout} = useAuth()
   const router = useRouter()
@@ -74,7 +74,13 @@ const Sidebar= () => {
       </nav>
       <div className='mb-4 ml-2 text-red-600 font-semibold cursor-pointer hover:border-red-500 border border-transparent p-2 duration-200 rounded-lg' onClick={handleLogout}>
         <button className='flex items-center cursor-pointer gap-2'>
-          <LogOut /> Logout
+          {
+            collapsed ? <LogOut />:(
+                <>
+                <LogOut /> Logout
+                </>
+            )
+          }
         </button>
       </div>
       <div className="border-t border-slate-200 p-4">
