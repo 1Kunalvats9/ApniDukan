@@ -127,10 +127,9 @@ const LandingPage = () => {
               </span>
               </Link>
               <a
-                  href="#features"
                   className="group px-8 py-4 bg-transparent text-slate-700 rounded-full font-semibold text-lg border border-slate-400 hover:bg-slate-900/5 hover:border-slate-500 transition-all duration-300 hover:scale-105"
               >
-              <span className="flex items-center justify-center">
+              <span className="flex items-center justify-center" id="features">
                 Explore Features
                 <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
               </span>
