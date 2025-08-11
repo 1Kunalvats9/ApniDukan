@@ -32,6 +32,8 @@ const LandingPage = () => {
     function raf(time) {
       lenis.raf(time);
       animationFrameId = requestAnimationFrame(raf);
+
+
     }
     animationFrameId = requestAnimationFrame(raf);
 
