@@ -138,6 +138,7 @@ export const AppProvider = ({ children }) => {
         updatedItemsInfo.push({
           name: existingProduct.name,
           quantityAdded: item.quantity,
+          matchedBy: updateReason
         });
       } else {
         // --- PRODUCT NOT FOUND: Add to discovered list ---
