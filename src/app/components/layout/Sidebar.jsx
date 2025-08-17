@@ -70,6 +70,7 @@ const Sidebar= () => {
         <NavItem to="/portal/analytics" icon={<BarChart size={20} />} label="Analytics" />
         <NavItem to="/portal/backup" icon={<Database size={20} />} label="Backup & Restore" />
         <NavItem to="/portal/parties" icon={<FileText size={20} />} label="Party Bills" />
+        <NavItem to="/portal/accounting" icon={<FileText size={20} />} label="Accounting" />
       </nav>
       <div className='mb-4 ml-2 text-red-600 font-semibold cursor-pointer hover:border-red-500 border border-transparent p-2 duration-200 rounded-lg' onClick={handleLogout}>
         <button className='flex items-center cursor-pointer gap-2'>

@@ -7,15 +7,18 @@ import { getUnitById, formatQuantityWithUnit, getCommonWeights } from '../../../
 import CartItem from '../../components/ui/CartItem'; 
 
 const SellPage = () => {
-  const { products, cart, addToCart, clearCart, checkout, getProductByBarcode } = useAppContext();
+  const { products, cart, addToCart, clearCart, checkout, getProductByBarcode, customers } = useAppContext();
   const [barcodeInput, setBarcodeInput] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [customerSuggestions, setCustomerSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
   const [scanFeedback, setScanFeedback] = useState('');
   const [isPrinting, setIsPrinting] = useState(false); 
   const [showWeightSelector, setShowWeightSelector] = useState(null);
+  const [isEditingQuantity, setIsEditingQuantity] = useState(false);
 
   const barcodeRef = useRef(null);
   const currentInvoiceDateTimeRef = useRef(''); 
@@ -74,14 +77,19 @@ const SellPage = () => {
   useEffect(() => {
     const currentBarcodeInput = barcodeRef.current;
     if (currentBarcodeInput) {
-      currentBarcodeInput.focus();
+      // Only focus if not editing quantity
+      if (!isEditingQuantity) {
+        currentBarcodeInput.focus();
+      }
 
       const handleGlobalKeyDown = (e) => {
         // Only allow direct typing into barcode input if it's not focused and key is a digit.
         // The automatic processing is now handled by the debounce effect.
         if (e.key.match(/^\d$/) && 
             document.activeElement !== currentBarcodeInput && 
-            !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+            !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName) &&
+            !document.activeElement.closest('.cart-quantity-input') &&
+            !isEditingQuantity) {
           currentBarcodeInput.focus();
           setBarcodeInput(e.key);
           e.preventDefault();
@@ -91,7 +99,9 @@ const SellPage = () => {
       const handleFocusOut = (e) => {
         setTimeout(() => {
           if (document.activeElement && 
-              !['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement.tagName)) {
+              !['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement.tagName) &&
+              !document.activeElement.closest('.cart-quantity-input') &&
+              !isEditingQuantity) {
             currentBarcodeInput.focus();
           }
         }, 100);
@@ -105,7 +115,7 @@ const SellPage = () => {
         currentBarcodeInput.removeEventListener('blur', handleFocusOut);
       };
     }
-  }, [processBarcode]);
+  }, [processBarcode, isEditingQuantity]);
 
   const handleBarcodeInputChange = (e) => {
     const value = e.target.value;
@@ -125,6 +135,20 @@ const SellPage = () => {
     }
   }, [searchQuery, products]);
 
+  // Customer phone suggestions
+  useEffect(() => {
+    if (customerPhone.trim().length >= 3) {
+      const suggestions = customers.filter(customer =>
+        customer.phoneNumber.includes(customerPhone.trim())
+      ).slice(0, 5);
+      setCustomerSuggestions(suggestions);
+      setShowSuggestions(suggestions.length > 0);
+    } else {
+      setCustomerSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }, [customerPhone, customers]);
+
   const handlePrintBill = useCallback(() => {
     if (cart.length === 0) {
       console.error("Cart is empty. Nothing to print!");
@@ -141,9 +165,10 @@ const SellPage = () => {
 
     let itemsHtml = cart.map(item => {
       const unit = getUnitById(item.unit || 'pc');
+      const hsnDisplay = item.hsnSacCode ? ` (HSN: ${item.hsnSacCode})` : '';
       return `
         <tr style="font-size: 0.9rem; line-height: 1.2;">
-            <td style="padding: 1px 2px;">${item.name}</td>
+            <td style="padding: 1px 2px;">${item.name}${hsnDisplay}</td>
             <td style="padding: 1px 2px; text-align: right;">${formatQuantityWithUnit(item.cartQuantity, item.unit || 'pc')}</td>
             <td style="padding: 1px 2px; text-align: right;">₹${Number(item.originalPrice).toFixed(2)}</td>
             <td style="padding: 1px 2px; text-align: right;">₹${Number(item.discountedPrice).toFixed(2)}</td>
@@ -230,6 +255,8 @@ const SellPage = () => {
             <div class="container">
                 <div class="text-center mb-6">
                     <h1 class="text-xxl font-bold">BALAJI BACHAT BAZAR</h1>
+                    <p class="text-sm">GST No: 08DOXPD1589D1ZJ</p>
+                    <p class="text-sm">UDYAM: UDYAM-RJ-37-0003460</p>
                     <p class="text-md">Contact: 9982171806</p>
                     <p class="text-lg font-bold mt-2">SALES INVOICE</p>
                 </div>
@@ -344,6 +371,15 @@ const SellPage = () => {
 
   const handleWeightSelect = (product, weight) => {
     handleAddProduct(product, weight, 'kg');
+  };
+
+  const handleCustomerSelect = (customer) => {
+    setCustomerPhone(customer.phoneNumber);
+    setShowSuggestions(false);
+  };
+
+  const handleCustomerPhoneChange = (e) => {
+    setCustomerPhone(e.target.value);
   };
 
   return (
@@ -556,16 +592,35 @@ const SellPage = () => {
                 <Phone size={16} className="mr-1" />
                 Customer Phone
               </label>
-              <input
-                type="tel"
-                id="customerPhone"
-                className="input w-full"
-                placeholder="Enter customer phone number"
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                pattern="[0-9]{10}"
-                required
-              />
+              <div className="relative">
+                <input
+                  type="tel"
+                  id="customerPhone"
+                  className="input w-full"
+                  placeholder="Enter customer phone number"
+                  value={customerPhone}
+                  onChange={handleCustomerPhoneChange}
+                  pattern="[0-9]{10}"
+                  required
+                />
+                {showSuggestions && customerSuggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg z-10 max-h-40 overflow-y-auto">
+                    {customerSuggestions.map((customer) => (
+                      <button
+                        key={customer.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-b-0"
+                        onClick={() => handleCustomerSelect(customer)}
+                      >
+                        <div className="font-medium">{customer.phoneNumber}</div>
+                        <div className="text-xs text-slate-500">
+                          Joined: {new Date(customer.createdAt).toLocaleDateString()}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <button
@@ -580,7 +635,7 @@ const SellPage = () => {
       </div>
 
       {checkoutSuccess && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-scale-in p-6 text-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check size={32} className="text-green-600" />

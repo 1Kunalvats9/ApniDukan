@@ -185,3 +185,40 @@ export const clearCache = () => {
   cache.parties = null;
   cache.lastUpdate = 0;
 };
+
+export const getExpenses = async () => {
+  try {
+    const expensesJson = localStorage.getItem('expenses_data');
+    return expensesJson ? JSON.parse(expensesJson) : [];
+  } catch (error) {
+    console.error('Error getting expenses from storage:', error);
+    return [];
+  }
+};
+
+export const saveExpenses = async (expenses) => {
+  try {
+    localStorage.setItem('expenses_data', JSON.stringify(expenses));
+  } catch (error) {
+    console.error('Error saving expenses to storage:', error);
+  }
+};
+
+// For tracking liabilities like loans, debts, etc.
+export const getLiabilities = async () => {
+  try {
+    const liabilitiesJson = localStorage.getItem('liabilities_data');
+    return liabilitiesJson ? JSON.parse(liabilitiesJson) : [];
+  } catch (error) {
+    console.error('Error getting liabilities from storage:', error);
+    return [];
+  }
+};
+
+export const saveLiabilities = async (liabilities) => {
+  try {
+    localStorage.setItem('liabilities_data', JSON.stringify(liabilities));
+  } catch (error) {
+    console.error('Error saving liabilities to storage:', error);
+  }
+};
