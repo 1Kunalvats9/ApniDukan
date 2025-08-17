@@ -71,8 +71,6 @@ const AccountingPage = () => {
             columnStyles: { 0: { halign: 'left', fontStyle: 'bold' } },
         });
 
-        // --- THIS IS THE FIX ---
-        // Use doc.lastAutoTable to get the position of the previously drawn table.
         autoTable(doc, {
             startY: doc.lastAutoTable.finalY + 10,
             head: [['Liabilities & Equity', 'Amount']],
@@ -134,7 +132,8 @@ const AccountingPage = () => {
                         <div>
                             <h3 className="font-bold mb-2 text-slate-800">Liabilities & Equity</h3>
                             <div className="flex justify-between text-sm"><span>Liabilities (Loans, Debts)</span> <span>₹{balanceSheet.liabilities.total.toFixed(2)}</span></div>
-                            <div className="flex justify-between text-sm"><span>Owner's Equity</span> <span>₹{balanceSheet.equity.total.toFixed(2)}</span></div>
+                            {/* FIX: Replaced ' with &apos; to escape the apostrophe */}
+                            <div className="flex justify-between text-sm"><span>Owner&apos;s Equity</span> <span>₹{balanceSheet.equity.total.toFixed(2)}</span></div>
                             <hr/>
                             <div className="flex justify-between font-bold"><span>Total Liabilities & Equity</span> <span>₹{(balanceSheet.liabilities.total + balanceSheet.equity.total).toFixed(2)}</span></div>
                         </div>
