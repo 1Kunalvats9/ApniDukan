@@ -37,6 +37,14 @@ const AddProductPage = () => {
   const barcodeRef = useRef(null);
   const hsnSacRef = useRef(null);
 
+  // --- FIX #2: Add useEffect for autofocus ---
+  useEffect(() => {
+    if (useScannedBarcode && barcodeRef.current) {
+      barcodeRef.current.focus();
+    }
+  }, [useScannedBarcode]);
+
+
   const processScannedBarcode = useCallback((barcode) => {
     if (!barcode || !barcode.trim()) {
       setScanFeedback('Invalid barcode. Please scan a valid barcode.');
@@ -86,15 +94,14 @@ const AddProductPage = () => {
     setBarcodeInput(e.target.value);
   };
 
-  // --- THIS IS THE FIX ---
-  // The missing function that caused the error.
   const handleHsnSacInputChange = (e) => {
     setHsnSacInput(e.target.value);
   };
-  // --- END FIX ---
 
+  // --- FIX #1: Correctly update form data state ---
   const handleInputChange = (e) => {
-    setFormData(prev => ({ ...prev, [name]: e.target.value }));
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const generateNewBarcode = () => {
