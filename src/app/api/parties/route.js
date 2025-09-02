@@ -31,7 +31,7 @@ export async function GET(request) {
 
     // Corrected logic to fetch parties for the user
     const parties = await Party.find({ userId: user.id }).sort({ createdAt: -1 });
-
+    console.log("The parties are", parties)
     return NextResponse.json(parties, { status: 200 });
   } catch (error) {
     console.error('Error fetching parties:', error);
