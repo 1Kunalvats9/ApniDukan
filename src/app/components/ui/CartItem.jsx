@@ -49,7 +49,6 @@ const CartItem = ({ item }) => {
       alert(`Cannot add more than ${maxStockQuantity} ${unit?.symbol || ''} of ${item.name}.`);
       return;
     }
-    // Always round to ensure clean values
     const finalValue = Math.round(value);
     updateCartItem(item.id, finalValue, item.unit);
   }, [item, maxStockQuantity, updateCartItem, unit]);
