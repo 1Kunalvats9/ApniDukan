@@ -102,6 +102,8 @@ const CartItem = ({ item }) => {
             </button>
           </div>
 
+
+
           {/* Unit Display and Edit Button */}
           <div className="flex flex-col items-center space-y-1">
             <span className="text-xs text-slate-500">{unit?.symbol || 'pc'}</span>
