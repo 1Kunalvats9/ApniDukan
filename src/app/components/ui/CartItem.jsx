@@ -42,7 +42,7 @@ const CartItem = ({ item }) => {
   const handleQuantitySelectorClose = () => {
     setShowQuantitySelector(false);
   };
-
+  
   const handleCustomQuantityChange = useCallback((e) => {
     const value = parseFloat(e.target.value) || 0;
     if (value > maxStockQuantity) {
