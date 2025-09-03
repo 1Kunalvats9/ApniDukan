@@ -157,7 +157,7 @@ const QuantitySelectorModal = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center space-x-3">
@@ -184,10 +184,10 @@ const QuantitySelectorModal = ({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <button
                 onClick={() => setSelectedUnit('kg')}
-                className={`p-3 rounded-lg border-2 transition-all ${
+                className={`p-3 rounded-lg border-2 transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
                   selectedUnit === 'kg'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                 }`}
               >
                 <Scale className="w-5 h-5 mx-auto mb-2" />
@@ -196,10 +196,10 @@ const QuantitySelectorModal = ({
               
               <button
                 onClick={() => setSelectedUnit('l')}
-                className={`p-3 rounded-lg border-2 transition-all ${
+                className={`p-3 rounded-lg border-2 transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
                   selectedUnit === 'l'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                 }`}
               >
                 <Droplets className="w-5 h-5 mx-auto mb-2" />
@@ -208,10 +208,10 @@ const QuantitySelectorModal = ({
               
               <button
                 onClick={() => setSelectedUnit('m')}
-                className={`p-3 rounded-lg border-2 transition-all ${
+                className={`p-3 rounded-lg border-2 transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
                   selectedUnit === 'm'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                 }`}
               >
                 <Package className="w-5 h-5 mx-auto mb-2" />
@@ -220,10 +220,10 @@ const QuantitySelectorModal = ({
               
               <button
                 onClick={() => setSelectedUnit('pc')}
-                className={`p-3 rounded-lg border-2 transition-all ${
+                className={`p-3 rounded-lg border-2 transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
                   selectedUnit === 'pc'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                 }`}
               >
                 <Package className="w-5 h-5 mx-auto mb-2" />
@@ -240,10 +240,10 @@ const QuantitySelectorModal = ({
                 <button
                   key={option.label}
                   onClick={() => handlePresetSelect(option)}
-                  className={`p-3 rounded-lg border-2 transition-all text-sm font-medium ${
+                  className={`p-3 rounded-lg border-2 transition-all text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
                     selectedQuantity === option.value && selectedUnit === option.unit
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 hover:shadow-sm'
                   }`}
                 >
                   {option.label}
@@ -258,9 +258,9 @@ const QuantitySelectorModal = ({
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => handleQuickAdjust(-0.1)}
-                className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50"
+                className="p-3 rounded-lg border border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
-                <Minus className="w-4 h-4" />
+                <Minus className="w-5 h-5" />
               </button>
               
               <div className="text-2xl font-bold text-gray-900 min-w-[80px] text-center">
@@ -270,9 +270,9 @@ const QuantitySelectorModal = ({
               
               <button
                 onClick={() => handleQuickAdjust(0.1)}
-                className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50"
+                className="p-3 rounded-lg border border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -343,14 +343,14 @@ const QuantitySelectorModal = ({
         <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50">
           <button
             onClick={onClose}
-            className="btn btn-outline"
+            className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
             disabled={selectedQuantity <= 0}
-            className="btn btn-primary"
+            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Add to Cart
           </button>

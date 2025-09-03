@@ -68,14 +68,9 @@ const SellPage = () => {
       if (currentCartQuantity >= product.quantity) {
         setScanFeedback(`Cannot add more ${product.name}. Insufficient stock (${product.quantity} available).`);
       } else {
-        // Check if it's an open product
-        if (isOpenProduct(product)) {
-          handleOpenQuantitySelector(product);
-          setScanFeedback(`Please select quantity for ${product.name}`);
-        } else {
-          addToCart(product, 1);
-          setScanFeedback(`Added ${product.name} to cart. ${existingCartItem ? 'Quantity increased.' : 'New item added.'}`);
-        }
+        // Always add 1 quantity by default, don't auto-show modal
+        addToCart(product, 1);
+        setScanFeedback(`Added ${product.name} to cart. ${existingCartItem ? 'Quantity increased.' : 'New item added.'}`);
         
         // Refresh bill number display when adding products via barcode
         const fetchBillNumber = async () => {
@@ -512,11 +507,7 @@ const SellPage = () => {
   };
 
   const handleAddProduct = (product, quantity = 1, unit = null) => {
-    // If it's an open product and no specific quantity/unit provided, show quantity selector
-    if (isOpenProduct(product) && quantity === 1 && unit === null) {
-      handleOpenQuantitySelector(product);
-      return;
-    }
+    // Don't auto-show modal, just add the product with specified quantity/unit
 
     const effectiveUnit = unit || product.unit || 'pc';
     const existingCartItem = activeCartItems.find(item => 
@@ -601,7 +592,7 @@ const SellPage = () => {
 
 
   return (
-    <div className="h-full flex flex-col gap-6">
+    <div className="h-full flex flex-col gap-6 pb-8">
       {/* Bill Number Display */}
       <div className="w-full">
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg p-4 text-center">
@@ -794,7 +785,7 @@ const SellPage = () => {
             )}
           </div>
 
-          <div className="p-4 border-t border-slate-200 bg-white mt-auto">
+          <div className="p-4 border-t border-slate-200 bg-white mt-auto mb-4">
             <div className="flex justify-between items-center mb-4">
               <span className="text-lg font-medium">Total</span>
               <span className="text-xl font-bold">₹{cartTotal.toFixed(2)}</span>
@@ -911,6 +902,9 @@ const SellPage = () => {
         currentQuantity={1}
         currentUnit={selectedProduct?.unit || 'pc'}
       />
+      
+      {/* Bottom spacing */}
+      <div className="h-8"></div>
     </div>
   );
 };
