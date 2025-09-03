@@ -6,7 +6,8 @@ import {
   getCustomers, saveCustomers,
   getSales, saveSales,
   getExpenses, saveExpenses,
-  getLiabilities, saveLiabilities
+  getLiabilities, saveLiabilities,
+  getBillNumber, incrementBillNumber, cleanupOldBillNumbers
 } from "../utils/storage"
 import { generateEAN13 } from '../utils/barcodeGenerator';
 
@@ -14,7 +15,17 @@ const AppContext = createContext(undefined);
 
 export const AppProvider = ({ children }) => {
   const [products, setProducts] = useState([]);
-  const [cart, setCart] = useState([]);
+  const [carts, setCarts] = useState([
+    {
+      id: 'cart-1',
+      name: 'Cart 1',
+      items: [],
+      customerPhone: '',
+      createdAt: new Date().toISOString(),
+      isActive: true
+    }
+  ]);
+  const [activeCartId, setActiveCartId] = useState('cart-1');
   const [customers, setCustomers] = useState([]);
   const [sales, setSales] = useState([]);
   const [expenses, setExpenses] = useState([]);
@@ -22,6 +33,68 @@ export const AppProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(Date.now());
   const [isEditingQuantity, setIsEditingQuantity] = useState(false);
+
+  // Helper functions for multi-cart system
+  const getActiveCart = useCallback(() => {
+    return carts.find(cart => cart.id === activeCartId) || carts[0];
+  }, [carts, activeCartId]);
+
+  const getActiveCartItems = useCallback(() => {
+    const activeCart = getActiveCart();
+    return activeCart ? activeCart.items : [];
+  }, [getActiveCart]);
+
+  const createNewCart = useCallback(() => {
+    const newCartId = `cart-${Date.now()}`;
+    const newCart = {
+      id: newCartId,
+      name: `Cart ${carts.length + 1}`,
+      items: [],
+      customerPhone: '',
+      createdAt: new Date().toISOString(),
+      isActive: false
+    };
+    
+    setCarts(prevCarts => [...prevCarts, newCart]);
+    return newCartId;
+  }, [carts.length]);
+
+  const deleteCart = useCallback((cartId) => {
+    if (carts.length <= 1) {
+      throw new Error('Cannot delete the last cart. At least one cart must remain.');
+    }
+    
+    setCarts(prevCarts => {
+      const filteredCarts = prevCarts.filter(cart => cart.id !== cartId);
+      
+      // If we're deleting the active cart, switch to the first available cart
+      if (cartId === activeCartId) {
+        setActiveCartId(filteredCarts[0].id);
+      }
+      
+      return filteredCarts;
+    });
+  }, [carts.length, activeCartId]);
+
+  const switchCart = useCallback((cartId) => {
+    setActiveCartId(cartId);
+    setCarts(prevCarts => 
+      prevCarts.map(cart => ({
+        ...cart,
+        isActive: cart.id === cartId
+      }))
+    );
+  }, []);
+
+  const updateCartCustomer = useCallback((cartId, customerPhone) => {
+    setCarts(prevCarts => 
+      prevCarts.map(cart => 
+        cart.id === cartId 
+          ? { ...cart, customerPhone }
+          : cart
+      )
+    );
+  }, []);
 
   const normalizeProducts = useCallback(async (productsData) => {
     // This function remains the same
@@ -51,6 +124,9 @@ export const AppProvider = ({ children }) => {
       setExpenses(expensesData || []);
       setLiabilities(liabilitiesData || []);
       setLastUpdate(Date.now());
+      
+      // Clean up old bill numbers periodically
+      await cleanupOldBillNumbers();
     } catch (error) { console.error('Error refreshing data:', error); }
   }, [normalizeProducts]);
 
@@ -234,51 +310,92 @@ export const AppProvider = ({ children }) => {
   }, [products]);
 
   const addToCart = useCallback((productToAdd, quantity = 1, unit = null) => {
-    setCart(prevCart => {
-      const effectiveUnit = unit || productToAdd.unit || 'pc';
-      const existingItemIndex = prevCart.findIndex(item =>
-          item.id === productToAdd.id && item.unit === effectiveUnit
-      );
-      if (existingItemIndex > -1) {
-        const updatedCart = [...prevCart];
-        updatedCart[existingItemIndex] = {
-          ...updatedCart[existingItemIndex],
-          cartQuantity: updatedCart[existingItemIndex].cartQuantity + quantity
-        };
-        return updatedCart;
-      } else {
-        return [...prevCart, {
-          ...productToAdd,
-          cartQuantity: quantity,
-          unit: effectiveUnit,
-          costPrice: productToAdd.costPrice || 0
-        }];
-      }
-    });
-  }, []);
+    setCarts(prevCarts => 
+      prevCarts.map(cart => {
+        if (cart.id === activeCartId) {
+          const effectiveUnit = unit || productToAdd.unit || 'pc';
+          const existingItemIndex = cart.items.findIndex(item =>
+              item.id === productToAdd.id && item.unit === effectiveUnit
+          );
+          
+          if (existingItemIndex > -1) {
+            const updatedItems = [...cart.items];
+            updatedItems[existingItemIndex] = {
+              ...updatedItems[existingItemIndex],
+              cartQuantity: updatedItems[existingItemIndex].cartQuantity + quantity
+            };
+            return { ...cart, items: updatedItems };
+          } else {
+            return {
+              ...cart,
+              items: [...cart.items, {
+                ...productToAdd,
+                cartQuantity: quantity,
+                unit: effectiveUnit,
+                costPrice: productToAdd.costPrice || 0
+              }]
+            };
+          }
+        }
+        return cart;
+      })
+    );
+  }, [activeCartId]);
 
   const updateCartItem = useCallback((id, quantity, unit = null) => {
-    setCart(prevCart =>
-        prevCart.map(item =>
-            item.id === id ? {
-              ...item,
-              cartQuantity: quantity,
-              unit: unit || item.unit
-            } : item
-        ).filter(item => item.cartQuantity > 0)
+    setCarts(prevCarts => 
+      prevCarts.map(cart => {
+        if (cart.id === activeCartId) {
+          const updatedItems = cart.items
+            .map(item =>
+                item.id === id ? {
+                  ...item,
+                  cartQuantity: quantity,
+                  unit: unit || item.unit
+                } : item
+            )
+            .filter(item => item.cartQuantity > 0);
+          return { ...cart, items: updatedItems };
+        }
+        return cart;
+      })
     );
-  }, []);
+  }, [activeCartId]);
 
   const removeFromCart = useCallback((id) => {
-    setCart(prevCart => prevCart.filter(item => item.id !== id));
-  }, []);
+    setCarts(prevCarts => 
+      prevCarts.map(cart => {
+        if (cart.id === activeCartId) {
+          return {
+            ...cart,
+            items: cart.items.filter(item => item.id !== id)
+          };
+        }
+        return cart;
+      })
+    );
+  }, [activeCartId]);
 
   const clearCart = useCallback(() => {
-    setCart([]);
-  }, []);
+    setCarts(prevCarts => 
+      prevCarts.map(cart => {
+        if (cart.id === activeCartId) {
+          return { ...cart, items: [] };
+        }
+        return cart;
+      })
+    );
+  }, [activeCartId]);
 
-  const checkout = useCallback(async (customerPhone) => {
-    if (cart.length === 0) return;
+  const checkout = useCallback(async (customerPhone, cartId = null) => {
+    const targetCartId = cartId || activeCartId;
+    const targetCart = carts.find(cart => cart.id === targetCartId);
+    
+    if (!targetCart || targetCart.items.length === 0) return;
+    
+    // Get the next bill number for today
+    const billNumber = await incrementBillNumber();
+    
     let currentCustomers = await getCustomers();
     let customer = currentCustomers.find(c => c.phoneNumber === customerPhone);
     let customerId;
@@ -293,8 +410,9 @@ export const AppProvider = ({ children }) => {
       customersNeedUpdate = true;
     }
     customerId = customer.id;
+    
     const updatedProducts = products.map(product => {
-      const cartItem = cart.find(item => item.id === product.id);
+      const cartItem = targetCart.items.find(item => item.id === product.id);
       if (cartItem) {
         return {
           ...product,
@@ -304,13 +422,16 @@ export const AppProvider = ({ children }) => {
       }
       return product;
     });
+    
     const newSale = {
       id: uuidv4(),
+      billNumber: billNumber,
       customerId: customerId,
-      items: cart.map(item => ({...item})),
-      total: cart.reduce((acc, item) => acc + (item.discountedPrice * item.cartQuantity), 0),
+      items: targetCart.items.map(item => ({...item})),
+      total: targetCart.items.reduce((acc, item) => acc + (item.discountedPrice * item.cartQuantity), 0),
       date: new Date().toISOString(),
     };
+    
     const promises = [
       saveProducts(updatedProducts),
       saveSales([...sales, newSale]),
@@ -319,9 +440,21 @@ export const AppProvider = ({ children }) => {
       promises.push(saveCustomers(currentCustomers));
     }
     await Promise.all(promises);
-    clearCart();
+    
+    // Clear the specific cart after successful checkout
+    setCarts(prevCarts => 
+      prevCarts.map(cart => 
+        cart.id === targetCartId 
+          ? { ...cart, items: [], customerPhone: '' }
+          : cart
+      )
+    );
+    
     await refreshData();
-  }, [cart, products, sales, clearCart, refreshData]);
+    
+    // Return the bill number for use in printing
+    return billNumber;
+  }, [carts, activeCartId, products, sales, refreshData]);
 
   const addExpense = useCallback(async (expenseData) => {
     const updatedExpenses = [...expenses, { id: uuidv4(), ...expenseData, date: new Date().toISOString() }];
@@ -354,6 +487,11 @@ export const AppProvider = ({ children }) => {
       equity: { retainedEarnings, total: totalEquity },
     },
   };
+  
+  // Get active cart info for analytics
+  const activeCart = getActiveCart();
+  const activeCartItems = getActiveCartItems();
+  
   const analytics = {
     totalProducts: products.length,
     inventoryWorth: products.reduce((acc, p) => acc + (p.discountedPrice * p.quantity), 0),
@@ -362,10 +500,12 @@ export const AppProvider = ({ children }) => {
     todaysIncome: sales
         .filter(s => new Date(s.date).toDateString() === new Date().toDateString())
         .reduce((acc, s) => acc + s.total, 0),
+    activeCartItems: activeCartItems.length,
+    activeCartTotal: activeCartItems.reduce((acc, item) => acc + (item.discountedPrice * item.cartQuantity), 0),
   };
 
   const value = {
-    products, cart, customers, sales, expenses, liabilities, analytics, accounting,
+    products, carts, activeCartId, customers, sales, expenses, liabilities, analytics, accounting,
     lastUpdate, loading,
     isEditingQuantity, setIsEditingQuantity,
     addProduct, updateProduct, deleteProduct, getProductByBarcode, getProductByHsnSacCode,
@@ -373,6 +513,8 @@ export const AppProvider = ({ children }) => {
     refreshData, addExpense, addLiability, ensureProductIds,
     processPurchaseBillItems,
     addDiscoveredProducts,
+    getBillNumber,
+    getActiveCart, getActiveCartItems, createNewCart, deleteCart, switchCart, updateCartCustomer,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

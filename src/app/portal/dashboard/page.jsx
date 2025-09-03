@@ -1,13 +1,15 @@
 'use client';
-import React, { useEffect } from 'react';
-import { Package, DollarSign, ShoppingCart, TrendingUp, Users, Clock, Percent, ShoppingBag } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Package, DollarSign, ShoppingCart, TrendingUp, Users, Clock, Percent, ShoppingBag, Receipt } from 'lucide-react';
 import { useAppContext } from '../../../context/AppContext';
 import StatCard from '../../components/ui/StatCard';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { getBillNumber } from '../../../utils/storage';
 
 const Dashboard = () => {
   const { analytics, products, sales } = useAppContext();
+  const [todayBillNumber, setTodayBillNumber] = useState(0);
 
   const router = useRouter()
   const recentSales = [...sales]
@@ -29,9 +31,23 @@ const Dashboard = () => {
     }
   },[])
 
+  // Fetch today's bill number
+  useEffect(() => {
+    const fetchBillNumber = async () => {
+      try {
+        const billNumber = await getBillNumber();
+        setTodayBillNumber(billNumber);
+      } catch (error) {
+        console.error('Error fetching bill number:', error);
+      }
+    };
+    
+    fetchBillNumber();
+  }, []);
+
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
         <StatCard
           title="Total Products"
           value={analytics.totalProducts}
@@ -55,6 +71,12 @@ const Dashboard = () => {
           value={`₹${analytics.todaysIncome.toFixed(2)}`}
           icon={TrendingUp}
           color="accent"
+        />
+        <StatCard
+          title="Next Bill No"
+          value={todayBillNumber}
+          icon={Receipt}
+          color="warning"
         />
       </div>
 
@@ -110,7 +132,14 @@ const Dashboard = () => {
                   <li key={sale.id} className="p-4 hover:bg-slate-50">
                     <div className="flex items-start justify-between">
                       <div>
-                        <p className="font-medium">{sale.customerPhone}</p>
+                        <p className="font-medium">
+                          {sale.customerPhone || 'Walk-in Customer'}
+                          {sale.billNumber && (
+                            <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                              Bill #{sale.billNumber}
+                            </span>
+                          )}
+                        </p>
                         <p className="text-sm text-slate-500">
                           {new Date(sale.date).toLocaleString()} • {sale.items.length} items
                         </p>

@@ -1,15 +1,33 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ShoppingBag, ScanLine, Plus, Phone, X, Check, Scale } from 'lucide-react';
+import { ShoppingBag, ScanLine, Phone, X, Check, Receipt } from 'lucide-react';
 import { useAppContext } from '../../../context/AppContext';
-import { getUnitById, formatQuantityWithUnit, getCommonWeights } from '../../../utils/units';
-import CartItem from '../../components/ui/CartItem'; 
+import { getUnitById, formatQuantityWithUnit } from '../../../utils/units';
+import CartItem from '../../components/ui/CartItem';
+import CartSelector from '../../components/ui/CartSelector';
+import QuantitySelectorModal from '../../components/ui/QuantitySelectorModal';
+import { getBillNumber } from '../../../utils/storage';
 
 const SellPage = () => {
-  const { products, cart, addToCart, clearCart, checkout, getProductByBarcode, customers } = useAppContext();
+  const { 
+    products, 
+    carts, 
+    activeCartId,
+    addToCart, 
+    clearCart, 
+    checkout, 
+    getProductByBarcode, 
+    customers,
+    createNewCart,
+    deleteCart,
+    switchCart,
+    updateCartCustomer,
+    getActiveCart,
+    getActiveCartItems
+  } = useAppContext();
+  
   const [barcodeInput, setBarcodeInput] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
   const [customerSuggestions, setCustomerSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -17,15 +35,19 @@ const SellPage = () => {
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
   const [scanFeedback, setScanFeedback] = useState('');
   const [isPrinting, setIsPrinting] = useState(false); 
-  const [showWeightSelector, setShowWeightSelector] = useState(null);
   const [isEditingQuantity, setIsEditingQuantity] = useState(false);
+  const [currentBillNumber, setCurrentBillNumber] = useState(0);
+  const [showQuantitySelector, setShowQuantitySelector] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
   const barcodeRef = useRef(null);
-  const currentInvoiceDateTimeRef = useRef(''); 
+  const currentInvoiceDateTimeRef = useRef('');
 
-  const cartTotal = cart.reduce((total, item) => total + (item.discountedPrice * item.cartQuantity), 0);
-
-  const totalSavings = cart.reduce((total, item) => {
+    // Get active cart data
+  const activeCart = getActiveCart();
+  const activeCartItems = getActiveCartItems();
+  const cartTotal = activeCartItems.reduce((total, item) => total + (item.discountedPrice * item.cartQuantity), 0);
+  const totalSavings = activeCartItems.reduce((total, item) => {
     const itemSavings = (item.originalPrice - item.discountedPrice) * item.cartQuantity;
     return total + itemSavings;
   }, 0);
@@ -40,14 +62,31 @@ const SellPage = () => {
     const product = getProductByBarcode(trimmedBarcode);
 
     if (product) {
-      const existingCartItem = cart.find(item => item.barcode === trimmedBarcode);
+      const existingCartItem = activeCartItems.find(item => item.barcode === trimmedBarcode);
       const currentCartQuantity = existingCartItem ? existingCartItem.cartQuantity : 0;
 
       if (currentCartQuantity >= product.quantity) {
         setScanFeedback(`Cannot add more ${product.name}. Insufficient stock (${product.quantity} available).`);
       } else {
-        addToCart(product, 1);
-        setScanFeedback(`Added ${product.name} to cart. ${existingCartItem ? 'Quantity increased.' : 'New item added.'}`);
+        // Check if it's an open product
+        if (isOpenProduct(product)) {
+          handleOpenQuantitySelector(product);
+          setScanFeedback(`Please select quantity for ${product.name}`);
+        } else {
+          addToCart(product, 1);
+          setScanFeedback(`Added ${product.name} to cart. ${existingCartItem ? 'Quantity increased.' : 'New item added.'}`);
+        }
+        
+        // Refresh bill number display when adding products via barcode
+        const fetchBillNumber = async () => {
+          try {
+            const billNumber = await getBillNumber();
+            setCurrentBillNumber(billNumber);
+          } catch (error) {
+            console.error('Error fetching bill number:', error);
+          }
+        };
+        fetchBillNumber();
       }
     } else {
       setScanFeedback(`Product with barcode ${trimmedBarcode} not found.`);
@@ -58,7 +97,7 @@ const SellPage = () => {
     // Refocus the input field after processing
     barcodeRef.current?.focus();
     setTimeout(() => setScanFeedback(''), 3000);
-  }, [addToCart, getProductByBarcode, cart]);
+  }, [addToCart, getProductByBarcode, activeCartItems]);
 
   // Debounce effect for barcode input
   useEffect(() => {
@@ -73,6 +112,34 @@ const SellPage = () => {
     };
   }, [barcodeInput, processBarcode]);
 
+  // Fetch current bill number
+  useEffect(() => {
+    const fetchBillNumber = async () => {
+      try {
+        const billNumber = await getBillNumber();
+        setCurrentBillNumber(billNumber);
+      } catch (error) {
+        console.error('Error fetching bill number:', error);
+      }
+    };
+    
+    fetchBillNumber();
+  }, []);
+
+  // Update customer phone when active cart changes
+  useEffect(() => {
+    if (activeCart && activeCart.customerPhone) {
+      // Update customer suggestions when cart changes
+      if (activeCart.customerPhone.trim().length >= 3) {
+        const suggestions = customers.filter(customer =>
+          customer.phoneNumber.includes(activeCart.customerPhone.trim())
+        ).slice(0, 5);
+        setCustomerSuggestions(suggestions);
+        setShowSuggestions(suggestions.length > 0);
+      }
+    }
+  }, [activeCart, customers]);
+
 
   useEffect(() => {
     const currentBarcodeInput = barcodeRef.current;
@@ -85,7 +152,7 @@ const SellPage = () => {
       const handleGlobalKeyDown = (e) => {
         // Only allow direct typing into barcode input if it's not focused and key is a digit.
         // The automatic processing is now handled by the debounce effect.
-        if (e.key.match(/^\d$/) && 
+        if (e.key && e.key.match(/^\d$/) && 
             document.activeElement !== currentBarcodeInput && 
             !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName) &&
             !document.activeElement.closest('.cart-quantity-input') &&
@@ -137,9 +204,9 @@ const SellPage = () => {
 
   // Customer phone suggestions
   useEffect(() => {
-    if (customerPhone.trim().length >= 3) {
+    if (activeCart.customerPhone && activeCart.customerPhone.trim().length >= 3) {
       const suggestions = customers.filter(customer =>
-        customer.phoneNumber.includes(customerPhone.trim())
+        customer.phoneNumber.includes(activeCart.customerPhone.trim())
       ).slice(0, 5);
       setCustomerSuggestions(suggestions);
       setShowSuggestions(suggestions.length > 0);
@@ -147,23 +214,49 @@ const SellPage = () => {
       setCustomerSuggestions([]);
       setShowSuggestions(false);
     }
-  }, [customerPhone, customers]);
+  }, [activeCart.customerPhone, customers]);
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const customerPhoneInput = document.getElementById('customerPhone');
+      const suggestionsContainer = event.target.closest('.customer-suggestions');
+      
+      if (customerPhoneInput && !customerPhoneInput.contains(event.target) && !suggestionsContainer) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const handlePrintBill = useCallback(() => {
-    if (cart.length === 0) {
+    if (activeCartItems.length === 0) {
       console.error("Cart is empty. Nothing to print!");
       return;
     }
 
     setIsPrinting(true);
 
-    const date = new Date(currentInvoiceDateTimeRef.current || new Date());
+    // Extract date and bill number from the ref
+    let date, billNumber;
+    if (currentInvoiceDateTimeRef.current && typeof currentInvoiceDateTimeRef.current === 'object') {
+      date = new Date(currentInvoiceDateTimeRef.current.date);
+      billNumber = currentInvoiceDateTimeRef.current.billNumber;
+    } else {
+      date = new Date();
+      billNumber = 1; // Fallback bill number
+    }
+    
     const formattedDate = date.toLocaleDateString('en-IN');
     const formattedTime = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
     const totalAmount = cartTotal.toFixed(2); 
     const savedMoney = totalSavings.toFixed(2); 
 
-    let itemsHtml = cart.map(item => {
+    let itemsHtml = activeCartItems.map(item => {
       const unit = getUnitById(item.unit || 'pc');
       const hsnDisplay = item.hsnSacCode ? ` (HSN: ${item.hsnSacCode})` : '';
       return `
@@ -262,9 +355,10 @@ const SellPage = () => {
                 </div>
 
                 <div class="mb-4 border-b pb-2 border-dashed">
-                    <p class="font-bold text-sm">Customer: ${customerPhone || 'WALK-IN'}</p>
+                    <p class="font-bold text-sm">Customer: ${activeCart.customerPhone || 'WALK-IN'}</p>
                     <p class="font-bold text-sm">Date: ${formattedDate}</p>
                     <p class="font-bold text-sm">Time: ${formattedTime}</p>
+                    <p class="font-bold text-sm">Bill No: ${billNumber}</p>
                 </div>
 
                 <table>
@@ -317,15 +411,15 @@ const SellPage = () => {
         setIsPrinting(false);
     };
 
-  }, [cart, cartTotal, totalSavings, customerPhone]); 
+  }, [activeCartItems, cartTotal, totalSavings, activeCart.customerPhone]); 
 
   const handleCheckout = async () => {
-    if (!customerPhone) {
+    if (!activeCart.customerPhone) {
       alert('Please enter customer phone number');
       return;
     }
 
-    if (cart.length === 0) {
+    if (activeCartItems.length === 0) {
       alert('Cart is empty');
       return;
     }
@@ -334,11 +428,17 @@ const SellPage = () => {
     currentInvoiceDateTimeRef.current = orderDateISO; 
 
     try {
-      await checkout(customerPhone); 
+      const billNumber = await checkout(activeCart.customerPhone, activeCartId); 
       setCheckoutSuccess(true);
-      setCustomerPhone('');
       setBarcodeInput(''); // Clear barcode input on successful checkout
       barcodeRef.current?.focus(); // Refocus barcode input
+
+      // Store the bill number for printing
+      currentInvoiceDateTimeRef.current = { date: orderDateISO, billNumber: billNumber };
+
+      // Refresh the bill number display
+      const newBillNumber = await getBillNumber();
+      setCurrentBillNumber(newBillNumber);
 
       setTimeout(() => {
         handlePrintBill();
@@ -350,9 +450,76 @@ const SellPage = () => {
     }
   };
 
+  const handleDeleteCart = (cartId) => {
+    try {
+      deleteCart(cartId);
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
+  const handleCreateCart = () => {
+    const newCartId = createNewCart();
+    switchCart(newCartId);
+  };
+
+  const handleSwitchCart = (cartId) => {
+    switchCart(cartId);
+    // Refresh bill number display when switching carts
+    const fetchBillNumber = async () => {
+      try {
+        const billNumber = await getBillNumber();
+        setCurrentBillNumber(billNumber);
+      } catch (error) {
+        console.error('Error fetching bill number:', error);
+      }
+    };
+    fetchBillNumber();
+  };
+
+  const handleUpdateCustomer = (cartId, customerPhone) => {
+    updateCartCustomer(cartId, customerPhone);
+    
+    // Close suggestions if customer phone is cleared or changed significantly
+    if (!customerPhone || customerPhone.trim().length < 3) {
+      setShowSuggestions(false);
+    }
+    
+    // Refresh bill number display when updating customer
+    const fetchBillNumber = async () => {
+      try {
+        const billNumber = await getBillNumber();
+        setCurrentBillNumber(billNumber);
+      } catch (error) {
+        console.error('Error fetching bill number:', error);
+      }
+    };
+    fetchBillNumber();
+  };
+
+  const handleClearCart = () => {
+    clearCart();
+    // Refresh bill number display when clearing cart
+    const fetchBillNumber = async () => {
+      try {
+        const billNumber = await getBillNumber();
+        setCurrentBillNumber(billNumber);
+      } catch (error) {
+        console.error('Error fetching bill number:', error);
+      }
+    };
+    fetchBillNumber();
+  };
+
   const handleAddProduct = (product, quantity = 1, unit = null) => {
+    // If it's an open product and no specific quantity/unit provided, show quantity selector
+    if (isOpenProduct(product) && quantity === 1 && unit === null) {
+      handleOpenQuantitySelector(product);
+      return;
+    }
+
     const effectiveUnit = unit || product.unit || 'pc';
-    const existingCartItem = cart.find(item => 
+    const existingCartItem = activeCartItems.find(item => 
       item.barcode === product.barcode && item.unit === effectiveUnit
     );
     const currentCartQuantity = existingCartItem ? existingCartItem.cartQuantity : 0;
@@ -365,27 +532,107 @@ const SellPage = () => {
     addToCart(product, quantity, effectiveUnit);
     setSearchQuery('');
     setSearchResults([]);
-    setShowWeightSelector(null);
     barcodeRef.current?.focus();
+
+    // Refresh bill number display when adding products
+    const fetchBillNumber = async () => {
+      try {
+        const billNumber = await getBillNumber();
+        setCurrentBillNumber(billNumber);
+      } catch (error) {
+        console.error('Error fetching bill number:', error);
+      }
+    };
+    fetchBillNumber();
   };
 
-  const handleWeightSelect = (product, weight) => {
-    handleAddProduct(product, weight, 'kg');
+
+
+  const handleRemoveFromCart = (itemId) => {
+    // This will be handled by the CartItem component, but we can refresh the bill number
+    const fetchBillNumber = async () => {
+      try {
+        const billNumber = await getBillNumber();
+        setCurrentBillNumber(billNumber);
+      } catch (error) {
+        console.error('Error fetching bill number:', error);
+      }
+    };
+    fetchBillNumber();
   };
 
-  const handleCustomerSelect = (customer) => {
-    setCustomerPhone(customer.phoneNumber);
-    setShowSuggestions(false);
+  const handleUpdateCartItem = (itemId, quantity, unit) => {
+    // This will be handled by the CartItem component, but we can refresh the bill number
+    const fetchBillNumber = async () => {
+      try {
+        const billNumber = await getBillNumber();
+        setCurrentBillNumber(billNumber);
+      } catch (error) {
+        console.error('Error fetching bill number:', error);
+      }
+    };
+    fetchBillNumber();
   };
 
-  const handleCustomerPhoneChange = (e) => {
-    setCustomerPhone(e.target.value);
+  const handleOpenQuantitySelector = (product) => {
+    setSelectedProduct(product);
+    setShowQuantitySelector(true);
   };
+
+  const handleQuantitySelectorConfirm = (quantity, unit) => {
+    if (selectedProduct) {
+      handleAddProduct(selectedProduct, quantity, unit);
+      setShowQuantitySelector(false);
+      setSelectedProduct(null);
+    }
+  };
+
+  const handleQuantitySelectorClose = () => {
+    setShowQuantitySelector(false);
+    setSelectedProduct(null);
+  };
+
+  // Check if product is open/loose (needs quantity selection)
+  const isOpenProduct = (product) => {
+    const openUnits = ['kg', 'g', 'l', 'ml', 'm', 'cm', 'dozen', 'pack', 'bundle', 'box', 'bag'];
+    return openUnits.includes(product.unit) || product.unit === 'pc' && product.quantity > 1;
+  };
+
+
 
   return (
-    <div className="h-full flex flex-col lg:flex-row gap-6">
-      <div className="lg:w-1/2 flex flex-col">
-        <div className="card mb-4 overflow-hidden">
+    <div className="h-full flex flex-col gap-6">
+      {/* Bill Number Display */}
+      <div className="w-full">
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg p-4 text-center">
+          <div className="flex items-center justify-center space-x-2">
+            <Receipt size={24} />
+            <span className="text-lg font-semibold">Next Bill Number: {currentBillNumber}</span>
+          </div>
+          <p className="text-blue-100 text-sm mt-1">
+            {new Date().toLocaleDateString('en-IN', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            })}
+          </p>
+        </div>
+      </div>
+
+      {/* Cart Selector */}
+      <CartSelector
+        carts={carts}
+        activeCartId={activeCartId}
+        onSwitchCart={handleSwitchCart}
+        onCreateCart={handleCreateCart}
+        onDeleteCart={handleDeleteCart}
+        onUpdateCustomer={handleUpdateCustomer}
+      />
+
+      <div className="flex flex-col lg:flex-row gap-6">
+        <div className="lg:w-1/2 flex flex-col">
+          <div className="card mb-4 overflow-hidden">
           <div className="p-4 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center">
             <h2 className="text-lg font-medium text-indigo-900 flex items-center">
               <ScanLine size={20} className="mr-2" />
@@ -467,7 +714,6 @@ const SellPage = () => {
               <ul className="divide-y divide-slate-200">
                 {searchResults.map((product, index) => {
                   const unit = getUnitById(product.unit || 'pc');
-                  const isWeightUnit = unit?.type === 'weight';
 
                   return (
                     <li
@@ -484,54 +730,28 @@ const SellPage = () => {
                         </div>
                         <div className="flex items-center space-x-2">
                           <span className="font-semibold">₹{product.discountedPrice} per {unit?.symbol || 'pc'}</span>
-                          <div className="flex space-x-1">
-                            {isWeightUnit && (
-                              <button 
-                                className="btn btn-secondary p-1"
-                                onClick={() => setShowWeightSelector(showWeightSelector === product.id ? null : product.id)}
-                                disabled={product.quantity <= 0}
-                                title="Select weight"
-                              >
-                                <Scale size={16} />
-                              </button>
-                            )}
+                          <div className="flex space-x-2">
                             <button 
-                              className="btn btn-ghost p-1"
+                              className="px-3 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              onClick={() => handleOpenQuantitySelector(product)}
+                              disabled={product.quantity <= 0}
+                              title="Select quantity & unit"
+                            >
+                              Edit Quantity
+                            </button>
+                            <button 
+                              className="px-3 py-2 text-sm bg-green-50 hover:bg-green-100 text-green-600 border border-green-200 rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               onClick={() => handleAddProduct(product)}
                               disabled={product.quantity <= 0}
+                              title="Add to cart"
                             >
-                              <Plus size={16} />
+                              Add
                             </button>
                           </div>
                         </div>
                       </div>
 
-                      {/* Weight Selector Dropdown */}
-                      {showWeightSelector === product.id && isWeightUnit && (
-                        <div className="absolute right-4 top-16 w-48 bg-white border border-slate-200 rounded-md shadow-lg z-10">
-                          <div className="p-3">
-                            <p className="text-xs font-medium text-slate-700 mb-2">Select Weight:</p>
-                            <div className="grid grid-cols-2 gap-1">
-                              {getCommonWeights().map((weight) => (
-                                <button
-                                  key={weight.value}
-                                  className="px-2 py-1 text-xs bg-slate-50 hover:bg-slate-100 rounded border"
-                                  onClick={() => handleWeightSelect(product, weight.value)}
-                                  disabled={weight.value > product.quantity}
-                                >
-                                  {weight.label}
-                                </button>
-                              ))}
-                            </div>
-                            <button
-                              className="w-full mt-2 px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 rounded border"
-                              onClick={() => setShowWeightSelector(null)}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      )}
+
                     </li>
                   );
                 })}
@@ -546,12 +766,12 @@ const SellPage = () => {
           <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
             <h2 className="text-lg font-medium flex items-center">
               <ShoppingBag size={20} className="mr-2" />
-              Shopping Cart ({cart.length} items)
+              {activeCart.name} ({activeCartItems.length} items)
             </h2>
-            {cart.length > 0 && (
+            {activeCartItems.length > 0 && (
               <button
                 className="btn btn-outline text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
-                onClick={clearCart}
+                onClick={handleClearCart}
               >
                 Clear Cart
               </button>
@@ -559,7 +779,7 @@ const SellPage = () => {
           </div>
 
           <div className="overflow-y-auto flex-grow">
-            {cart.length === 0 ? (
+            {activeCartItems.length === 0 ? (
               <div className="p-8 text-center text-slate-500">
                 <ShoppingBag size={48} className="mx-auto mb-4 text-slate-300" />
                 <p>Your cart is empty</p>
@@ -567,7 +787,7 @@ const SellPage = () => {
               </div>
             ) : (
               <div>
-                {cart.map((item, index) => (
+                {activeCartItems.map((item, index) => (
                   <CartItem key={`${item.id}-${item.unit}-${index}`} item={item} />
                 ))}
               </div>
@@ -598,19 +818,41 @@ const SellPage = () => {
                   id="customerPhone"
                   className="input w-full"
                   placeholder="Enter customer phone number"
-                  value={customerPhone}
-                  onChange={handleCustomerPhoneChange}
+                  value={activeCart.customerPhone || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    handleUpdateCustomer(activeCartId, value);
+                    
+                    // Show suggestions only if there are 3+ characters
+                    if (value.trim().length >= 3) {
+                      const suggestions = customers.filter(customer =>
+                        customer.phoneNumber.includes(value.trim())
+                      ).slice(0, 5);
+                      setCustomerSuggestions(suggestions);
+                      setShowSuggestions(suggestions.length > 0);
+                    } else {
+                      setShowSuggestions(false);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === 'Escape') {
+                      setShowSuggestions(false);
+                    }
+                  }}
                   pattern="[0-9]{10}"
                   required
                 />
                 {showSuggestions && customerSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg z-10 max-h-40 overflow-y-auto">
+                  <div className="absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg z-10 max-h-40 overflow-y-auto customer-suggestions">
                     {customerSuggestions.map((customer) => (
                       <button
                         key={customer.id}
                         type="button"
                         className="w-full text-left px-3 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-b-0"
-                        onClick={() => handleCustomerSelect(customer)}
+                        onClick={() => {
+                          handleUpdateCustomer(activeCartId, customer.phoneNumber);
+                          setShowSuggestions(false); // Close suggestions modal
+                        }}
                       >
                         <div className="font-medium">{customer.phoneNumber}</div>
                         <div className="text-xs text-slate-500">
@@ -626,13 +868,14 @@ const SellPage = () => {
             <button
               className="btn btn-primary w-full py-3"
               onClick={handleCheckout}
-              disabled={cart.length === 0 || !customerPhone}
+              disabled={activeCartItems.length === 0 || !activeCart.customerPhone}
             >
               Checkout
             </button>
           </div>
         </div>
       </div>
+    </div>
 
       {checkoutSuccess && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -641,7 +884,14 @@ const SellPage = () => {
               <Check size={32} className="text-green-600" />
             </div>
             <h2 className="text-2xl font-bold text-green-600 mb-2">Checkout Successful!</h2>
-            <p className="text-slate-600 mb-6">The sale has been recorded successfully.</p>
+            <p className="text-slate-600 mb-6">
+              The sale has been recorded successfully.
+              {currentInvoiceDateTimeRef.current && typeof currentInvoiceDateTimeRef.current === 'object' && (
+                <span className="block mt-2 text-blue-600 font-semibold">
+                  Bill Number: {currentInvoiceDateTimeRef.current.billNumber}
+                </span>
+              )}
+            </p>
             <button
               className="btn btn-primary w-full"
               onClick={() => setCheckoutSuccess(false)}
@@ -651,6 +901,16 @@ const SellPage = () => {
           </div>
         </div>
       )}
+
+      {/* Quantity Selector Modal */}
+      <QuantitySelectorModal
+        isOpen={showQuantitySelector}
+        onClose={handleQuantitySelectorClose}
+        onConfirm={handleQuantitySelectorConfirm}
+        product={selectedProduct}
+        currentQuantity={1}
+        currentUnit={selectedProduct?.unit || 'pc'}
+      />
     </div>
   );
 };

@@ -1,18 +1,18 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
-import { Minus, Plus, Trash2, Scale } from 'lucide-react';
+import { Minus, Plus, Trash2 } from 'lucide-react';
 import { useAppContext } from '../../../context/AppContext';
-import { formatQuantityWithUnit, getUnitById, getCommonWeights } from '../../../utils/units';
+import { formatQuantityWithUnit, getUnitById } from '../../../utils/units';
+import QuantitySelectorModal from './QuantitySelectorModal';
 
 const CartItem = ({ item }) => {
   const { updateCartItem, removeFromCart, products } = useAppContext();
-  const [showWeightSelector, setShowWeightSelector] = useState(false);
+  const [showQuantitySelector, setShowQuantitySelector] = useState(false);
 
   const productData = products.find(p => p.id === item.id);
   const maxStockQuantity = productData ? productData.quantity : Infinity;
   const unit = getUnitById(item.unit || 'pc');
-  const isWeightUnit = unit?.type === 'weight';
 
   const handleQuantityChange = useCallback((amount) => {
     const newQuantity = item.cartQuantity + amount;
@@ -22,28 +22,34 @@ const CartItem = ({ item }) => {
     } else if (newQuantity > maxStockQuantity) {
       alert(`Cannot add more ${item.name}. Only ${maxStockQuantity} available.`);
     } else {
-      // Ensure integer values for piece units
-      const finalQuantity = unit?.type === 'piece' ? Math.round(newQuantity) : newQuantity;
+      // Always round to ensure clean values
+      const finalQuantity = Math.round(newQuantity);
       updateCartItem(item.id, finalQuantity, item.unit);
     }
   }, [item, maxStockQuantity, updateCartItem, removeFromCart]);
 
-  const handleWeightSelect = useCallback((weight) => {
-    if (weight > maxStockQuantity) {
-      alert(`Cannot add ${formatQuantityWithUnit(weight, 'kg')} of ${item.name}. Only ${maxStockQuantity} kg available.`);
-      return;
-    }
-    updateCartItem(item.id, weight, 'kg');
-    setShowWeightSelector(false);
-  }, [item, maxStockQuantity, updateCartItem]);
 
+
+  const handleOpenQuantitySelector = () => {
+    setShowQuantitySelector(true);
+  };
+
+  const handleQuantitySelectorConfirm = (quantity, unit) => {
+    updateCartItem(item.id, quantity, unit);
+    setShowQuantitySelector(false);
+  };
+
+  const handleQuantitySelectorClose = () => {
+    setShowQuantitySelector(false);
+  };
+  
   const handleCustomQuantityChange = useCallback((e) => {
     const value = parseFloat(e.target.value) || 0;
     if (value > maxStockQuantity) {
       alert(`Cannot add more than ${maxStockQuantity} ${unit?.symbol || ''} of ${item.name}.`);
       return;
     }
-    const finalValue = unit?.type === 'piece' ? Math.round(value) : value;
+    const finalValue = Math.round(value);
     updateCartItem(item.id, finalValue, item.unit);
   }, [item, maxStockQuantity, updateCartItem, unit]);
 
@@ -71,32 +77,20 @@ const CartItem = ({ item }) => {
             <button
               className="p-1 hover:bg-slate-100 text-slate-700"
               onClick={() => handleQuantityChange(-decrementStep)}
-              disabled={item.cartQuantity <= (isWeightUnit ? 0.1 : 1)}
+              disabled={item.cartQuantity <= 1}
             >
               <Minus size={16} />
             </button>
             
-            {isWeightUnit ? (
-              <input
-                type="number"
-                step="0.1"
-                min="0.1"
-                max={maxStockQuantity}
-                value={item.cartQuantity}
-                onChange={handleCustomQuantityChange}
-                className="w-16 px-1 py-1 text-center text-sm border-0 focus:outline-none cart-quantity-input"
-              />
-            ) : (
-              <input
-                type="number"
-                step="1"
-                min="1"
-                max={maxStockQuantity}
-                value={item.cartQuantity}
-                onChange={handleCustomQuantityChange}
-                className="w-16 px-1 py-1 text-center text-sm border-0 focus:outline-none cart-quantity-input"
-              />
-            )}
+            <input
+              type="number"
+              step="1"
+              min="1"
+              max={maxStockQuantity}
+              value={item.cartQuantity}
+              onChange={handleCustomQuantityChange}
+              className="w-16 px-1 py-1 text-center text-sm border-0 focus:outline-none cart-quantity-input"
+            />
             
             <button
               className="p-1 hover:bg-slate-100 text-slate-700"
@@ -107,18 +101,18 @@ const CartItem = ({ item }) => {
             </button>
           </div>
 
-          {/* Unit Display and Quick Weight Selector */}
-          <div className="flex items-center space-x-1">
+
+
+          {/* Unit Display and Edit Button */}
+          <div className="flex flex-col items-center space-y-1">
             <span className="text-xs text-slate-500">{unit?.symbol || 'pc'}</span>
-            {isWeightUnit && (
-              <button
-                className="p-1 text-slate-400 hover:text-slate-600"
-                onClick={() => setShowWeightSelector(!showWeightSelector)}
-                title="Quick weight selection"
-              >
-                <Scale size={12} />
-              </button>
-            )}
+            <button
+              className="px-3 py-1.5 text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-md font-medium transition-colors shadow-sm hover:shadow-md"
+              onClick={handleOpenQuantitySelector}
+              title="Edit quantity and unit"
+            >
+              Edit Quantity
+            </button>
           </div>
         </div>
 
@@ -137,26 +131,15 @@ const CartItem = ({ item }) => {
         </button>
       </div>
 
-      {/* Quick Weight Selector Dropdown */}
-      {showWeightSelector && isWeightUnit && (
-        <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-md shadow-lg z-10">
-          <div className="p-2">
-            <p className="text-xs font-medium text-slate-700 mb-2">Quick Select Weight:</p>
-            <div className="grid grid-cols-2 gap-1">
-              {getCommonWeights().map((weight) => (
-                <button
-                  key={weight.value}
-                  className="px-2 py-1 text-xs bg-slate-50 hover:bg-slate-100 rounded border"
-                  onClick={() => handleWeightSelect(weight.value)}
-                  disabled={weight.value > maxStockQuantity}
-                >
-                  {weight.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Quantity Selector Modal */}
+      <QuantitySelectorModal
+        isOpen={showQuantitySelector}
+        onClose={handleQuantitySelectorClose}
+        onConfirm={handleQuantitySelectorConfirm}
+        product={productData}
+        currentQuantity={item.cartQuantity}
+        currentUnit={item.unit}
+      />
     </div>
   );
 };
