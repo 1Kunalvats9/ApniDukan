@@ -43,7 +43,6 @@ const CartItem = ({ item }) => {
       alert(`Cannot add more than ${maxStockQuantity} ${unit?.symbol || ''} of ${item.name}.`);
       return;
     }
-    // Ensure integer values for piece units
     const finalValue = unit?.type === 'piece' ? Math.round(value) : value;
     updateCartItem(item.id, finalValue, item.unit);
   }, [item, maxStockQuantity, updateCartItem, unit]);
