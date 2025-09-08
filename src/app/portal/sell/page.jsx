@@ -7,17 +7,17 @@ import { getUnitById, formatQuantityWithUnit } from '../../../utils/units';
 import CartItem from '../../components/ui/CartItem';
 import CartSelector from '../../components/ui/CartSelector';
 import QuantitySelectorModal from '../../components/ui/QuantitySelectorModal';
-import { getBillNumber } from '../../../utils/storage';
+import { getCurrentBillNumber } from '../../../utils/storage';
 
 const SellPage = () => {
   const { 
-    products, 
-    carts, 
+    products,
+    carts,
     activeCartId,
-    addToCart, 
+    addToCart,
     clearCart, 
-    checkout, 
-    getProductByBarcode, 
+    checkout,
+    getProductByBarcode,
     customers,
     createNewCart,
     deleteCart,
@@ -36,7 +36,7 @@ const SellPage = () => {
   const [scanFeedback, setScanFeedback] = useState('');
   const [isPrinting, setIsPrinting] = useState(false); 
   const [isEditingQuantity, setIsEditingQuantity] = useState(false);
-  const [currentBillNumber, setCurrentBillNumber] = useState(0);
+  const [nextBillNumber, setNextBillNumber] = useState(1);
   const [showQuantitySelector, setShowQuantitySelector] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
@@ -71,17 +71,6 @@ const SellPage = () => {
         // Always add 1 quantity by default, don't auto-show modal
         addToCart(product, 1);
         setScanFeedback(`Added ${product.name} to cart. ${existingCartItem ? 'Quantity increased.' : 'New item added.'}`);
-        
-        // Refresh bill number display when adding products via barcode
-        const fetchBillNumber = async () => {
-          try {
-            const billNumber = await getBillNumber();
-            setCurrentBillNumber(billNumber);
-          } catch (error) {
-            console.error('Error fetching bill number:', error);
-          }
-        };
-        fetchBillNumber();
       }
     } else {
       setScanFeedback(`Product with barcode ${trimmedBarcode} not found.`);
@@ -107,18 +96,19 @@ const SellPage = () => {
     };
   }, [barcodeInput, processBarcode]);
 
-  // Fetch current bill number
+  // Initialize next bill number display
   useEffect(() => {
-    const fetchBillNumber = async () => {
+    const fetchNextBillNumber = async () => {
       try {
-        const billNumber = await getBillNumber();
-        setCurrentBillNumber(billNumber);
+        const currentBillNumber = await getCurrentBillNumber();
+        setNextBillNumber(currentBillNumber + 1);
       } catch (error) {
-        console.error('Error fetching bill number:', error);
+        console.error('Error fetching next bill number:', error);
+        setNextBillNumber(1);
       }
     };
     
-    fetchBillNumber();
+    fetchNextBillNumber();
   }, []);
 
   // Update customer phone when active cart changes
@@ -423,7 +413,10 @@ const SellPage = () => {
     currentInvoiceDateTimeRef.current = orderDateISO; 
 
     try {
+      console.log('Starting checkout process...');
       const billNumber = await checkout(activeCart.customerPhone, activeCartId); 
+      console.log(`Checkout completed with bill number: ${billNumber}`);
+      
       setCheckoutSuccess(true);
       setBarcodeInput(''); // Clear barcode input on successful checkout
       barcodeRef.current?.focus(); // Refocus barcode input
@@ -431,9 +424,9 @@ const SellPage = () => {
       // Store the bill number for printing
       currentInvoiceDateTimeRef.current = { date: orderDateISO, billNumber: billNumber };
 
-      // Refresh the bill number display
-      const newBillNumber = await getBillNumber();
-      setCurrentBillNumber(newBillNumber);
+      // Refresh the next bill number display
+      const currentBillNumber = await getCurrentBillNumber();
+      setNextBillNumber(currentBillNumber + 1);
 
       setTimeout(() => {
         handlePrintBill();
@@ -460,16 +453,6 @@ const SellPage = () => {
 
   const handleSwitchCart = (cartId) => {
     switchCart(cartId);
-    // Refresh bill number display when switching carts
-    const fetchBillNumber = async () => {
-      try {
-        const billNumber = await getBillNumber();
-        setCurrentBillNumber(billNumber);
-      } catch (error) {
-        console.error('Error fetching bill number:', error);
-      }
-    };
-    fetchBillNumber();
   };
 
   const handleUpdateCustomer = (cartId, customerPhone) => {
@@ -479,31 +462,10 @@ const SellPage = () => {
     if (!customerPhone || customerPhone.trim().length < 3) {
       setShowSuggestions(false);
     }
-    
-    // Refresh bill number display when updating customer
-    const fetchBillNumber = async () => {
-      try {
-        const billNumber = await getBillNumber();
-        setCurrentBillNumber(billNumber);
-      } catch (error) {
-        console.error('Error fetching bill number:', error);
-      }
-    };
-    fetchBillNumber();
   };
 
   const handleClearCart = () => {
     clearCart();
-    // Refresh bill number display when clearing cart
-    const fetchBillNumber = async () => {
-      try {
-        const billNumber = await getBillNumber();
-        setCurrentBillNumber(billNumber);
-      } catch (error) {
-        console.error('Error fetching bill number:', error);
-      }
-    };
-    fetchBillNumber();
   };
 
   const handleAddProduct = (product, quantity = 1, unit = null) => {
@@ -524,45 +486,16 @@ const SellPage = () => {
     setSearchQuery('');
     setSearchResults([]);
     barcodeRef.current?.focus();
-
-    // Refresh bill number display when adding products
-    const fetchBillNumber = async () => {
-      try {
-        const billNumber = await getBillNumber();
-        setCurrentBillNumber(billNumber);
-      } catch (error) {
-        console.error('Error fetching bill number:', error);
-      }
-    };
-    fetchBillNumber();
   };
 
 
 
   const handleRemoveFromCart = (itemId) => {
-    // This will be handled by the CartItem component, but we can refresh the bill number
-    const fetchBillNumber = async () => {
-      try {
-        const billNumber = await getBillNumber();
-        setCurrentBillNumber(billNumber);
-      } catch (error) {
-        console.error('Error fetching bill number:', error);
-      }
-    };
-    fetchBillNumber();
+    // This will be handled by the CartItem component
   };
 
   const handleUpdateCartItem = (itemId, quantity, unit) => {
-    // This will be handled by the CartItem component, but we can refresh the bill number
-    const fetchBillNumber = async () => {
-      try {
-        const billNumber = await getBillNumber();
-        setCurrentBillNumber(billNumber);
-      } catch (error) {
-        console.error('Error fetching bill number:', error);
-      }
-    };
-    fetchBillNumber();
+    // This will be handled by the CartItem component
   };
 
   const handleOpenQuantitySelector = (product) => {
@@ -598,7 +531,7 @@ const SellPage = () => {
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg p-4 text-center">
           <div className="flex items-center justify-center space-x-2">
             <Receipt size={24} />
-            <span className="text-lg font-semibold">Next Bill Number: {currentBillNumber}</span>
+            <span className="text-lg font-semibold">Next Bill Number: {nextBillNumber}</span>
           </div>
           <p className="text-blue-100 text-sm mt-1">
             {new Date().toLocaleDateString('en-IN', { 

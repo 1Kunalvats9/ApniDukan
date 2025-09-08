@@ -50,6 +50,7 @@ const migrateLocalStorageToLocalForage = async (key) => {
   }
 };
 
+
 export const getProducts = async () => {
   try {
     if (isCacheValid('products')) {
@@ -223,106 +224,24 @@ export const saveLiabilities = async (liabilities) => {
   }
 };
 
-// Bill numbering functionality
-export const getBillNumber = async () => {
+// Simple bill numbering functionality - starts from 1 and increments with each checkout
+export const getNextBillNumber = async () => {
   try {
-    const today = new Date().toDateString();
-    const billData = await localforage.getItem('bill_numbers') || {};
-    
-    // Check if we have data for today
-    if (billData[today]) {
-      return billData[today];
-    }
-    
-    // If no data for today, start with 1
-    return 1;
+    const currentBillNumber = await localforage.getItem('current_bill_number') || 0;
+    const nextBillNumber = currentBillNumber + 1;
+    await localforage.setItem('current_bill_number', nextBillNumber);
+    return nextBillNumber;
   } catch (error) {
-    console.error('Error getting bill number:', error);
+    console.error('Error getting next bill number:', error);
     return 1;
   }
 };
 
-export const incrementBillNumber = async () => {
+export const getCurrentBillNumber = async () => {
   try {
-    const today = new Date().toDateString();
-    const billData = await localforage.getItem('bill_numbers') || {};
-    
-    // Increment bill number for today
-    billData[today] = (billData[today] || 0) + 1;
-    
-    // Save the updated bill numbers
-    await localforage.setItem('bill_numbers', billData);
-    
-    return billData[today];
+    return await localforage.getItem('current_bill_number') || 0;
   } catch (error) {
-    console.error('Error incrementing bill number:', error);
-    return 1;
-  }
-};
-
-export const getBillNumberForDate = async (date) => {
-  try {
-    const billData = await localforage.getItem('bill_numbers') || {};
-    const targetDate = new Date(date).toDateString();
-    return billData[targetDate] || 0;
-  } catch (error) {
-    console.error('Error getting bill number for date:', error);
+    console.error('Error getting current bill number:', error);
     return 0;
-  }
-};
-
-export const cleanupOldBillNumbers = async () => {
-  try {
-    const billData = await localforage.getItem('bill_numbers') || {};
-    const today = new Date().toDateString();
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toDateString();
-    
-    // Remove bill numbers older than 30 days
-    const cleanedData = {};
-    Object.keys(billData).forEach(date => {
-      if (date >= thirtyDaysAgo) {
-        cleanedData[date] = billData[date];
-      }
-    });
-    
-    await localforage.setItem('bill_numbers', cleanedData);
-  } catch (error) {
-    console.error('Error cleaning up old bill numbers:', error);
-  }
-};
-
-// Get bill number for a specific sale
-export const getBillNumberForSale = async (saleDate) => {
-  try {
-    const billData = await localforage.getItem('bill_numbers') || {};
-    const targetDate = new Date(saleDate).toDateString();
-    return billData[targetDate] || 0;
-  } catch (error) {
-    console.error('Error getting bill number for sale:', error);
-    return 0;
-  }
-};
-
-// Reset bill numbers for a specific date (useful for testing)
-export const resetBillNumbersForDate = async (date) => {
-  try {
-    const billData = await localforage.getItem('bill_numbers') || {};
-    const targetDate = new Date(date).toDateString();
-    billData[targetDate] = 0;
-    await localforage.setItem('bill_numbers', billData);
-    return true;
-  } catch (error) {
-    console.error('Error resetting bill numbers for date:', error);
-    return false;
-  }
-};
-
-// Get all bill numbers data (for debugging)
-export const getAllBillNumbers = async () => {
-  try {
-    return await localforage.getItem('bill_numbers') || {};
-  } catch (error) {
-    console.error('Error getting all bill numbers:', error);
-    return {};
   }
 };

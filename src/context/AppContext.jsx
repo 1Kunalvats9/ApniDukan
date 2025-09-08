@@ -7,7 +7,7 @@ import {
   getSales, saveSales,
   getExpenses, saveExpenses,
   getLiabilities, saveLiabilities,
-  getBillNumber, incrementBillNumber, cleanupOldBillNumbers
+  getNextBillNumber
 } from "../utils/storage"
 import { generateEAN13 } from '../utils/barcodeGenerator';
 
@@ -124,9 +124,6 @@ export const AppProvider = ({ children }) => {
       setExpenses(expensesData || []);
       setLiabilities(liabilitiesData || []);
       setLastUpdate(Date.now());
-      
-      // Clean up old bill numbers periodically
-      await cleanupOldBillNumbers();
     } catch (error) { console.error('Error refreshing data:', error); }
   }, [normalizeProducts]);
 
@@ -393,8 +390,8 @@ export const AppProvider = ({ children }) => {
     
     if (!targetCart || targetCart.items.length === 0) return;
     
-    // Get the next bill number for today
-    const billNumber = await incrementBillNumber();
+    // Get the next bill number
+    const billNumber = await getNextBillNumber();
     
     let currentCustomers = await getCustomers();
     let customer = currentCustomers.find(c => c.phoneNumber === customerPhone);
@@ -513,7 +510,6 @@ export const AppProvider = ({ children }) => {
     refreshData, addExpense, addLiability, ensureProductIds,
     processPurchaseBillItems,
     addDiscoveredProducts,
-    getBillNumber,
     getActiveCart, getActiveCartItems, createNewCart, deleteCart, switchCart, updateCartCustomer,
   };
 
