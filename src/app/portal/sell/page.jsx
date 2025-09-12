@@ -369,6 +369,7 @@ const SellPage = () => {
                 <div class="text-center mt-6">
                     <p class="text-md font-bold">THANK YOU FOR YOUR PURCHASE!</p>
                     <p class="text-sm mt-2">Visit Again!</p>
+                    <p class="text-sm mt-2">All invoice gst under composition</p>
                 </div>
             </div>
         </body>
