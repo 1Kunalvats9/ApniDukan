@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ShoppingBag, ScanLine, Phone, X, Check, Receipt } from 'lucide-react';
 import { useAppContext } from '../../../context/AppContext';
 import { getUnitById, formatQuantityWithUnit } from '../../../utils/units';
@@ -8,10 +8,12 @@ import CartItem from '../../components/ui/CartItem';
 import CartSelector from '../../components/ui/CartSelector';
 import QuantitySelectorModal from '../../components/ui/QuantitySelectorModal';
 import { getCurrentBillNumber } from '../../../utils/storage';
+import * as XLSX from 'xlsx';
 
 const SellPage = () => {
   const { 
     products,
+    sales,
     carts,
     activeCartId,
     addToCart,
@@ -39,6 +41,98 @@ const SellPage = () => {
   const [nextBillNumber, setNextBillNumber] = useState(1);
   const [showQuantitySelector, setShowQuantitySelector] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [exportFilter, setExportFilter] = useState('all');
+  const [exporting, setExporting] = useState(false);
+
+  const monthOptions = useMemo(() => {
+    const set = new Set((sales || []).map(s => {
+      const d = new Date(s.date);
+      if (Number.isNaN(d.getTime())) return null;
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      return `${y}-${m}`;
+    }).filter(Boolean));
+    return Array.from(set).sort().reverse();
+  }, [sales]);
+
+  const filterSalesBySelection = useCallback(() => {
+    if (!sales || sales.length === 0) return [];
+    const now = new Date();
+    let startDate = null;
+    if (exportFilter === 'last1m') {
+      startDate = new Date(now);
+      startDate.setMonth(startDate.getMonth() - 1);
+    } else if (exportFilter === 'last3m') {
+      startDate = new Date(now);
+      startDate.setMonth(startDate.getMonth() - 3);
+    } else if (exportFilter.startsWith('month:')) {
+      const ym = exportFilter.split(':')[1]; // yyyy-mm
+      const [y, m] = ym.split('-').map(Number);
+      startDate = new Date(y, m - 1, 1, 0, 0, 0, 0);
+      const endDate = new Date(y, m, 1, 0, 0, 0, 0);
+      return sales.filter(s => {
+        const d = new Date(s.date);
+        return d >= startDate && d < endDate;
+      });
+    }
+    if (!startDate) return sales;
+    return sales.filter(s => new Date(s.date) >= startDate);
+  }, [sales, exportFilter]);
+
+  const handleExportSales = useCallback(() => {
+    try {
+      setExporting(true);
+      const filteredSales = filterSalesBySelection();
+      const header = [
+        'Date', 'Bill Number', 'Customer Phone', 'Item', 'Quantity', 'Unit', 'Rate', 'Amount'
+      ];
+      const rows = [header];
+      let grandTotal = 0;
+      const totalOrders = filteredSales.length;
+      const totalRevenue = filteredSales.reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+      filteredSales.forEach(sale => {
+        const saleDate = new Date(sale.date);
+        const dateStr = isNaN(saleDate.getTime()) ? '' : saleDate.toLocaleString('en-IN');
+        const customerPhone = sale.customerId || ''; // In local storage, we only have customerId (phone)
+        sale.items.forEach(item => {
+          const unit = item.unit || 'pc';
+          const qtyStr = formatQuantityWithUnit(item.cartQuantity, unit);
+          const rate = Number(item.discountedPrice) || 0;
+          const amount = rate * (Number(item.cartQuantity) || 0);
+          grandTotal += amount;
+          rows.push([
+            dateStr,
+            sale.billNumber,
+            customerPhone,
+            item.name,
+            qtyStr,
+            unit,
+            rate,
+            amount,
+          ]);
+        });
+      });
+      rows.push([]);
+      rows.push(['TOTAL ORDERS', totalOrders, '', '', '', '', '', '']);
+      rows.push(['TOTAL REVENUE (by orders)', '', '', '', '', '', '', totalRevenue]);
+      rows.push(['TOTAL SOLD (by items)', '', '', '', '', '', '', grandTotal]);
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Sales');
+      const filename = exportFilter.startsWith('month:')
+        ? `sales_${exportFilter.split(':')[1]}.xlsx`
+        : exportFilter === 'last1m' ? 'sales_last_1_month.xlsx'
+        : exportFilter === 'last3m' ? 'sales_last_3_months.xlsx'
+        : 'sales_all_time.xlsx';
+      XLSX.writeFile(wb, filename);
+    } catch (e) {
+      console.error('Export failed:', e);
+      alert('Export failed. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  }, [filterSalesBySelection, exportFilter]);
 
   const barcodeRef = useRef(null);
   const currentInvoiceDateTimeRef = useRef('');
@@ -529,10 +623,37 @@ const SellPage = () => {
     <div className="h-full flex flex-col gap-6 pb-8">
       {/* Bill Number Display */}
       <div className="w-full">
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg p-4 text-center">
-          <div className="flex items-center justify-center space-x-2">
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg p-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="flex items-center justify-center lg:justify-start space-x-2">
             <Receipt size={24} />
             <span className="text-lg font-semibold">Next Bill Number: {nextBillNumber}</span>
+            </div>
+            {/* Export Controls */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <select
+                className="text-slate-900 rounded-md px-3 py-2 bg-white/95"
+                value={exportFilter}
+                onChange={(e) => setExportFilter(e.target.value)}
+              >
+                <option value="all">All Time</option>
+                <option value="last1m">Last 1 Month</option>
+                <option value="last3m">Last 3 Months</option>
+                <optgroup label="By Month">
+                  {monthOptions.map((ym) => (
+                    <option key={ym} value={`month:${ym}`}>{ym}</option>
+                  ))}
+                </optgroup>
+              </select>
+              <button
+                className={`px-4 py-2 rounded-md bg-white text-indigo-700 font-semibold hover:bg-indigo-50 disabled:opacity-60 disabled:cursor-not-allowed`}
+                onClick={() => handleExportSales()}
+                disabled={exporting}
+                title="Export checkout history to Excel"
+              >
+                {exporting ? 'Exporting…' : 'Export Sales (Excel)'}
+              </button>
+            </div>
           </div>
           <p className="text-blue-100 text-sm mt-1">
             {new Date().toLocaleDateString('en-IN', { 
