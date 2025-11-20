@@ -25,7 +25,7 @@ async function connectDB() {
 
   try {
     cached.conn = await cached.promise;
-    console.log('mongodb connected succesffully')
+    console.log('mongodb connected succesffully!!')
   } catch (e) {
     cached.promise = null;
     throw e;
